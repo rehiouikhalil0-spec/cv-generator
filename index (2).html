@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CV & Lettre Generator</title>
+<script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue: #1a56db; --blue-light: #e8f0fe; --blue-dark: #1044b0;
+    --border: #e2e8f0; --bg: #f8fafc; --card: #ffffff;
+    --text: #1e293b; --muted: #64748b; --green: #1F6B2E;
+    --radius: 12px; --radius-sm: 8px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 820px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 2rem; }
+  header h1 { font-size: 1.8rem; font-weight: 700; color: var(--blue); margin-bottom: 0.3rem; }
+  header p { color: var(--muted); font-size: 0.92rem; }
+  .nav-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1.5px solid var(--border); }
+  .nav-tab { padding: 0.6rem 1.2rem; font-size: 0.9rem; font-weight: 500; cursor: pointer; color: var(--muted); border-bottom: 2.5px solid transparent; margin-bottom: -1.5px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; }
+  .nav-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+  .nav-tab:hover:not(.active) { color: var(--text); }
+  .page { display: none; }
+  .page.active { display: block; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.25rem; }
+  .card-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 1rem; }
+  .card-subtitle { font-size: 0.82rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.5; }
+  label { display: block; font-size: 0.83rem; font-weight: 500; color: var(--muted); margin-bottom: 0.35rem; }
+  input[type="text"], input[type="email"], input[type="tel"], textarea, select {
+    width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 0.65rem 0.9rem; font-size: 0.9rem; font-family: inherit;
+    color: var(--text); background: white; outline: none; transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--blue); }
+  textarea { resize: vertical; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+  .field { margin-bottom: 1rem; }
+  .btn { width: 100%; padding: 0.85rem; background: var(--blue); color: white; border: none; border-radius: var(--radius-sm); font-size: 1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: background 0.15s, transform 0.1s; margin-top: 0.5rem; }
+  .btn:hover { background: var(--blue-dark); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-green { background: white; color: var(--green); border: 1.5px solid var(--green); border-radius: var(--radius-sm); font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; width: 100%; margin-top: 0.75rem; transition: background 0.15s; }
+  .btn-green:hover { background: #f0fdf4; }
+  .btn-save { background: #0f9b58; }
+  .btn-save:hover { background: #0a7a44; }
+  .status { text-align: center; font-size: 0.85rem; color: var(--muted); margin-top: 0.6rem; min-height: 20px; }
+  .result-box { margin-top: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: none; }
+  .result-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: var(--blue-light); border-bottom: 1px solid var(--border); }
+  .result-header span { font-size: 0.8rem; font-weight: 600; color: var(--blue); text-transform: uppercase; letter-spacing: 0.05em; }
+  .copy-btn { font-size: 0.8rem; padding: 0.3rem 0.8rem; background: white; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--muted); }
+  .copy-btn:hover { background: var(--bg); }
+  .result-text { padding: 1.25rem; font-size: 0.88rem; line-height: 1.85; white-space: pre-wrap; color: var(--text); max-height: 520px; overflow-y: auto; }
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .note { font-size: 0.82rem; color: var(--muted); background: var(--blue-light); border-radius: var(--radius-sm); padding: 0.65rem 0.9rem; margin-bottom: 1rem; line-height: 1.5; }
+  .gen-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .gen-tab { flex: 1; padding: 0.7rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: white; font-size: 0.9rem; font-weight: 500; cursor: pointer; color: var(--muted); transition: all 0.15s; text-align: center; }
+  .gen-tab.active { background: var(--blue-light); border-color: var(--blue); color: var(--blue); }
+  .gen-tab:hover:not(.active) { background: var(--bg); }
+  .gen-panel { display: none; }
+  .gen-panel.active { display: block; }
+  .profile-summary { background: var(--blue-light); border-radius: var(--radius-sm); padding: 0.9rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: var(--blue-dark); line-height: 1.6; }
+  @media (max-width: 600px) {
+    .row2, .row3 { grid-template-columns: 1fr; }
+    header h1 { font-size: 1.4rem; }
+    .nav-tab { padding: 0.5rem 0.7rem; font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>✦ CV & Lettre Generator</h1>
+    <p>Remplis ton profil une fois — génère des lettres et CV adaptés à chaque offre</p>
+  </header>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('profil')">👤 Mon Profil</button>
+    <button class="nav-tab" onclick="showPage('generateur')">✦ Générer</button>
+  </div>
+
+  <!-- ═══════════════ PAGE PROFIL ═══════════════ -->
+  <div class="page active" id="page-profil">
+
+    <div class="card">
+      <div class="card-title">Informations personnelles</div>
+      <div class="row2">
+        <div class="field"><label>Prénom</label><input type="text" id="prenom" placeholder="Votre prénom" /></div>
+        <div class="field"><label>Nom</label><input type="text" id="nom" placeholder="Votre nom" /></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Email</label><input type="email" id="email" placeholder="votre.email@exemple.com" /></div>
+        <div class="field"><label>Téléphone</label><input type="tel" id="tel" placeholder="06 XX XX XX XX" /></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Ville</label><input type="text" id="ville" placeholder="Paris" /></div>
+        <div class="field"><label>Code postal</label><input type="text" id="cp" placeholder="75000" /></div>
+        <div class="field"><label>Permis</label>
+          <select id="permis">
+            <option value="">Aucun</option>
+            <option value="Permis B">Permis B</option>
+            <option value="Permis B, véhicule personnel">Permis B + véhicule</option>
+            <option value="Permis A">Permis A</option>
+            <option value="Permis C">Permis C (poids lourd)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Mobilité</label><input type="text" id="mobilite" placeholder="ex : France entière, Île-de-France..." /></div>
+        <div class="field"><label>Âge</label><input type="text" id="age" placeholder="ex : 23" /></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Formation</div>
+      <div class="card-subtitle">Du diplôme le plus récent au plus ancien.</div>
+      <div class="field"><label>Diplôme 1 (le plus récent)</label><input type="text" id="formation1" placeholder="ex : Master Supply Chain — Université de Lyon (2025 – en cours)" /></div>
+      <div class="field"><label>Diplôme 2</label><input type="text" id="formation2" placeholder="ex : Licence Pro Logistique — IUT de Bordeaux (2022–2024)" /></div>
+      <div class="field"><label>Diplôme 3</label><input type="text" id="formation3" placeholder="ex : BTS Transport & Logistique (2020–2022)" /></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Expériences professionnelles</div>
+      <div class="card-subtitle">Décris chaque expérience avec le maximum de détails — l'IA les adaptera à chaque offre.</div>
+      <div class="field"><label>Expérience 1 (la plus récente)</label><textarea id="exp1" rows="5" placeholder="ex : Chargé de logistique — Entreprise XYZ | Paris | 6 mois&#10;- Gestion des stocks et suivi des flux entrants/sortants&#10;- Coordination avec les transporteurs et fournisseurs&#10;- Utilisation du WMS et de l'ERP SAP"></textarea></div>
+      <div class="field"><label>Expérience 2</label><textarea id="exp2" rows="4" placeholder="ex : Stage Assistant Supply Chain — Entreprise ABC | Lyon | 3 mois&#10;- Analyse des données de stock sous Excel&#10;- Participation aux inventaires..."></textarea></div>
+      <div class="field"><label>Expérience 3 (optionnel)</label><textarea id="exp3" rows="3" placeholder="ex : Job étudiant, bénévolat, projet associatif..."></textarea></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Compétences & Outils</div>
+      <div class="field"><label>Compétences techniques</label><textarea id="competences" rows="3" placeholder="ex : ERP : SAP, Oracle | WMS : Manhattan | Excel avancé, Power BI | Lean Management, Amélioration continue"></textarea></div>
+      <div class="field"><label>Atouts personnels</label><textarea id="atouts" rows="2" placeholder="ex : Rigoureux, autonome, esprit d'analyse, force de proposition, bon communicant"></textarea></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Certifications & Langues</div>
+      <div class="field"><label>Certifications</label><textarea id="certifications" rows="3" placeholder="ex : Supply Chain Fundamentals — Coursera&#10;Lean Six Sigma Yellow Belt — Udemy&#10;Excel avancé — LinkedIn Learning"></textarea></div>
+      <div class="field"><label>Langues</label><input type="text" id="langues" placeholder="ex : Français natif, Anglais C1, Espagnol B1" /></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Autres informations</div>
+      <div class="field"><label>Centres d'intérêt</label><input type="text" id="interets" placeholder="ex : Sport, voyages, vie associative, lecture" /></div>
+      <div class="field"><label>Informations complémentaires</label><textarea id="autre" rows="2" placeholder="ex : Disponible dès septembre 2026, ouvert à la mobilité internationale, cherche une alternance de 12 mois..."></textarea></div>
+    </div>
+
+    <button class="btn btn-save" onclick="sauvegarder()">
+      💾 Sauvegarder mon profil
+    </button>
+    <div class="status" id="statusSave"></div>
+
+  </div>
+
+  <!-- ═══════════════ PAGE GÉNÉRER ═══════════════ -->
+  <div class="page" id="page-generateur">
+
+    <div class="profile-summary" id="profileSummary"></div>
+
+    <div class="card">
+      <div class="card-title">Offre d'emploi</div>
+      <textarea id="offre" rows="9" placeholder="Colle ici le texte complet de l'offre d'emploi..."></textarea>
+    </div>
+
+    <div class="gen-tabs">
+      <div class="gen-tab active" onclick="switchGenTab('lettre')">✉ Lettre de motivation</div>
+      <div class="gen-tab" onclick="switchGenTab('cv')">📄 Adapter mon CV</div>
+    </div>
+
+    <div class="gen-panel active" id="gen-lettre">
+      <div class="card">
+        <div class="row2">
+          <div class="field"><label>Ville d'envoi</label><input type="text" id="villeSend" /></div>
+          <div class="field"><label>Date</label><input type="text" id="dateSend" /></div>
+        </div>
+        <button class="btn" id="btnLettre" onclick="genLettre()">
+          <span id="iconLettre">✦</span>
+          <span id="txtLettre">Générer la lettre de motivation</span>
+        </button>
+        <div class="status" id="statusLettre"></div>
+        <div class="result-box" id="resLettre">
+          <div class="result-header">
+            <span>Lettre générée</span>
+            <button class="copy-btn" onclick="copier('resLettreText')">Copier</button>
+          </div>
+          <div class="result-text" id="resLettreText"></div>
+        </div>
+        <button class="btn-green" id="btnWordLettre" onclick="telechargerWord('lettre')" style="display:none;">📄 Télécharger en Word (.docx)</button>
+      </div>
+    </div>
+
+    <div class="gen-panel" id="gen-cv">
+      <div class="card">
+        <div class="note">💡 L'IA réorganise tes expériences avec les mots-clés de l'offre — sans rien inventer.</div>
+        <button class="btn" id="btnCV" onclick="genCV()">
+          <span id="iconCV">✦</span>
+          <span id="txtCV">Adapter mon CV à l'offre</span>
+        </button>
+        <div class="status" id="statusCV"></div>
+        <div class="result-box" id="resCV">
+          <div class="result-header">
+            <span>CV adapté</span>
+            <button class="copy-btn" onclick="copier('resCVText')">Copier</button>
+          </div>
+          <div class="result-text" id="resCVText"></div>
+        </div>
+        <button class="btn-green" id="btnWordCV" onclick="telechargerWord('cv')" style="display:none;">📄 Télécharger en Word (.docx)</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const GROQ_KEY = "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";
+const MODEL = "llama-3.3-70b-versatile";
+const STORAGE_KEY = "cv_generator_profil_v2";
+
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach((el, i) => {
+    if ((i===0&&p==='profil')||(i===1&&p==='generateur')) el.classList.add('active');
+  });
+  if (p === 'generateur') updateProfileSummary();
+}
+
+function switchGenTab(t) {
+  document.querySelectorAll('.gen-tab').forEach((el, i) => {
+    el.classList.toggle('active', (i===0&&t==='lettre')||(i===1&&t==='cv'));
+  });
+  document.getElementById('gen-lettre').classList.toggle('active', t==='lettre');
+  document.getElementById('gen-cv').classList.toggle('active', t==='cv');
+}
+
+const FIELDS = ['prenom','nom','email','tel','ville','cp','permis','mobilite','age',
+                'formation1','formation2','formation3','exp1','exp2','exp3',
+                'competences','atouts','certifications','langues','interets','autre'];
+
+function chargerProfil() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return;
+  const data = JSON.parse(saved);
+  FIELDS.forEach(f => { const el = document.getElementById(f); if (el && data[f]) el.value = data[f]; });
+  if (data.ville) document.getElementById('villeSend').value = data.ville;
+}
+
+function sauvegarder() {
+  const data = {};
+  FIELDS.forEach(f => { const el = document.getElementById(f); if (el) data[f] = el.value; });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const status = document.getElementById('statusSave');
+  status.style.color = '#0f9b58';
+  status.textContent = '✓ Profil sauvegardé avec succès !';
+  setTimeout(() => { status.textContent = ''; }, 3000);
+}
+
+function getProfil() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) return JSON.parse(saved);
+  const data = {};
+  FIELDS.forEach(f => { const el = document.getElementById(f); if (el) data[f] = el.value; });
+  return data;
+}
+
+function buildCVData(p) {
+  const nom = [p.prenom, p.nom].filter(Boolean).join(' ') || 'Le candidat';
+  return `
+NOM : ${nom}
+CONTACT : ${[p.ville, p.cp ? '('+p.cp+')' : '', p.tel, p.email, p.permis, p.mobilite ? 'Mobilité : '+p.mobilite : '', p.age ? p.age+' ans' : ''].filter(Boolean).join(' | ')}
+
+FORMATION :
+${[p.formation1, p.formation2, p.formation3].filter(Boolean).map(f => '- ' + f).join('\n') || '- Non renseignée'}
+
+EXPÉRIENCES PROFESSIONNELLES :
+${[p.exp1, p.exp2, p.exp3].filter(Boolean).join('\n\n') || 'Non renseignées'}
+
+COMPÉTENCES TECHNIQUES :
+${p.competences || 'Non renseignées'}
+
+CERTIFICATIONS :
+${p.certifications || 'Aucune'}
+
+LANGUES : ${p.langues || 'Non renseignées'}
+
+ATOUTS PERSONNELS : ${p.atouts || 'Non renseignés'}
+
+CENTRES D'INTÉRÊT : ${p.interets || 'Non renseignés'}
+${p.autre ? '\nINFOS COMPLÉMENTAIRES : ' + p.autre : ''}
+`.trim();
+}
+
+function updateProfileSummary() {
+  const p = getProfil();
+  const nom = [p.prenom, p.nom].filter(Boolean).join(' ');
+  const el = document.getElementById('profileSummary');
+  if (!nom) {
+    el.innerHTML = '⚠️ <strong>Profil vide</strong> — va dans "Mon Profil" pour remplir tes informations avant de générer.';
+  } else {
+    el.innerHTML = `👤 <strong>${nom}</strong> — ${p.formation1 || 'Formation non renseignée'} — <a href="#" onclick="showPage('profil'); return false;" style="color:var(--blue); font-weight:500;">Modifier mon profil</a>`;
+  }
+  document.getElementById('villeSend').value = p.ville || '';
+}
+
+async function callGroq(systemPrompt, userPrompt, statusId, btnId, iconId, txtId, loadingTxt) {
+  const offre = document.getElementById('offre').value.trim();
+  if (!offre) { document.getElementById(statusId).textContent = "Merci de coller le texte de l'offre."; return null; }
+  const p = getProfil();
+  if (!p.prenom && !p.nom) { document.getElementById(statusId).textContent = "Merci de remplir ton profil d'abord !"; return null; }
+
+  const btn = document.getElementById(btnId);
+  const icon = document.getElementById(iconId);
+  const txt = document.getElementById(txtId);
+  const status = document.getElementById(statusId);
+
+  btn.disabled = true;
+  icon.innerHTML = '<span class="spinner"></span>';
+  txt.textContent = loadingTxt;
+  status.textContent = "L'IA génère votre document...";
+
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${GROQ_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 1400,
+        temperature: 0.65
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) { status.textContent = "Erreur : " + (data.error?.message || "Réessaie."); return null; }
+    status.textContent = "✓ Généré avec succès !";
+    return data.choices?.[0]?.message?.content || "Erreur.";
+  } catch(e) {
+    status.textContent = "Erreur de connexion. Réessaie.";
+    return null;
+  } finally {
+    btn.disabled = false;
+    icon.textContent = '✦';
+  }
+}
+
+async function genLettre() {
+  const p = getProfil();
+  const offre = document.getElementById('offre').value.trim();
+  const ville = document.getElementById('villeSend').value.trim() || p.ville || '';
+  const date = document.getElementById('dateSend').value.trim();
+  const cvData = buildCVData(p);
+  const nom = [p.prenom, p.nom].filter(Boolean).join(' ');
+
+  const systemPrompt = `Tu es un expert en rédaction de lettres de motivation professionnelles en français. 
+Tu rédiges des lettres percutantes, directes et personnalisées. 
+Tu n'utilises jamais de formules creuses ou de phrases génériques.
+Tu structures toujours la lettre ainsi :
+1. En-tête complet (coordonnées candidat, destinataire, date, ville, objet)
+2. Salutation
+3. Paragraphe 1 — Accroche ciblée sur les missions exactes de l'offre
+4. Paragraphe 2 — Expérience(s) la/les plus pertinente(s) pour ce poste, avec des faits concrets
+5. Paragraphe 3 — Compétences techniques et certifications alignées sur l'offre
+6. Paragraphe 4 — Motivation sincère pour cette entreprise et ce poste spécifique
+7. Paragraphe 5 — Conclusion et appel à l'action
+8. Formule de politesse et signature`;
+
+  const userPrompt = `Voici le CV complet du candidat :
+${cvData}
+
+Voici l'offre d'emploi :
+${offre}
+
+Rédige une lettre de motivation professionnelle en français avec ces règles STRICTES :
+- Prose fluide uniquement, JAMAIS de bullet points dans le corps
+- Chaque paragraphe fait 3-5 phrases, bien développé
+- Utilise des mots-clés exacts de l'offre naturellement intégrés
+- Mentionne les certifications si pertinentes pour ce poste
+- Relie les atouts personnels aux qualités recherchées dans l'offre
+- En-tête : coordonnées de ${nom}, date : ${date}, ville : ${ville}
+- Corps de lettre entre 350 et 450 mots
+- Ton professionnel, direct, sans formules creuses
+
+Écris UNIQUEMENT la lettre complète, rien avant, rien après.`;
+
+  const result = await callGroq(systemPrompt, userPrompt, 'statusLettre', 'btnLettre', 'iconLettre', 'txtLettre', 'Génération en cours...');
+  if (result) {
+    document.getElementById('resLettreText').textContent = result.trim();
+    document.getElementById('resLettre').style.display = 'block';
+    document.getElementById('btnWordLettre').style.display = 'flex';
+    document.getElementById('resLettre').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('txtLettre').textContent = 'Regénérer la lettre';
+  }
+}
+
+async function genCV() {
+  const p = getProfil();
+  const offre = document.getElementById('offre').value.trim();
+  const cvData = buildCVData(p);
+
+  const systemPrompt = `Tu es un expert en optimisation de CV pour le recrutement en France.
+Tu adaptes les CV de manière professionnelle et percutante.
+Tu ne changes jamais les faits — tu reformules et réorganises uniquement.
+Tu utilises les mots-clés exacts de l'offre dans les reformulations.
+Tu produis toujours un CV structuré avec ces sections dans l'ordre :
+PROFIL / EXPÉRIENCES PROFESSIONNELLES / FORMATIONS / COMPÉTENCES TECHNIQUES / CERTIFICATIONS / ATOUTS / LANGUES`;
+
+  const userPrompt = `Voici le CV complet du candidat :
+${cvData}
+
+Voici l'offre d'emploi :
+${offre}
+
+Adapte ce CV pour cette offre avec ces règles STRICTES :
+1. PROFIL : 2-3 phrases percutantes qui répondent directement aux besoins de l'offre
+2. EXPÉRIENCES : reformule chaque mission avec les mots-clés de l'offre, mets en premier les expériences les plus pertinentes
+3. FORMATIONS : telles quelles, du plus récent au plus ancien
+4. COMPÉTENCES TECHNIQUES : priorise et mets en gras celles qui matchent directement l'offre
+5. CERTIFICATIONS : inclure ABSOLUMENT TOUTES les certifications du candidat — c'est non négociable
+6. ATOUTS : inclure ABSOLUMENT TOUS les atouts personnels, en les reliant au profil recherché dans l'offre
+7. LANGUES : telles quelles avec les niveaux exacts
+
+Important : ne jamais inventer d'expériences ou compétences que le candidat n'a pas.
+
+Écris UNIQUEMENT le CV adapté et structuré, rien avant, rien après.`;
+
+  const result = await callGroq(systemPrompt, userPrompt, 'statusCV', 'btnCV', 'iconCV', 'txtCV', 'Adaptation en cours...');
+  if (result) {
+    document.getElementById('resCVText').textContent = result.trim();
+    document.getElementById('resCV').style.display = 'block';
+    document.getElementById('btnWordCV').style.display = 'flex';
+    document.getElementById('resCV').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('txtCV').textContent = 'Ré-adapter mon CV';
+  }
+}
+
+async function telechargerWord(type) {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle } = docx;
+  const text = document.getElementById(type === 'lettre' ? 'resLettreText' : 'resCVText').textContent;
+  const p = getProfil();
+  const nom = [p.prenom, p.nom].filter(Boolean).join('_') || 'Candidat';
+  const filename = type === 'lettre' ? `Lettre_Motivation_${nom}.docx` : `CV_${nom}_Adapte.docx`;
+
+  const lines = text.split('\n');
+  const children = lines.map(line => {
+    const t = line.trim();
+    const isSection = t === t.toUpperCase() && t.length > 2 && t.length < 70 && !t.startsWith('-') && !t.startsWith('•') && t.length > 0 && /[A-ZÀÉÈÊËÎÏÔÙÛÜ]/.test(t);
+    const isBullet = t.startsWith('-') || t.startsWith('•');
+
+    if (isSection) {
+      return new Paragraph({
+        spacing: { before: 280, after: 80 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "1a56db", space: 4 } },
+        children: [new TextRun({ text: t, bold: true, size: 24, color: "1a56db", font: "Arial" })]
+      });
+    } else if (isBullet) {
+      return new Paragraph({
+        spacing: { before: 40, after: 40 },
+        indent: { left: 400, hanging: 200 },
+        children: [new TextRun({ text: "• " + t.replace(/^[-•]\s*/, ''), size: 22, font: "Arial" })]
+      });
+    } else if (t.length === 0) {
+      return new Paragraph({ spacing: { before: 80, after: 0 }, children: [new TextRun("")] });
+    } else {
+      return new Paragraph({
+        spacing: { before: 40, after: 40 },
+        alignment: type === 'lettre' ? AlignmentType.JUSTIFIED : AlignmentType.LEFT,
+        children: [new TextRun({ text: t, size: 22, font: "Arial" })]
+      });
+    }
+  });
+
+  const doc = new Document({
+    styles: { default: { document: { run: { font: "Arial", size: 22 } } } },
+    sections: [{
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } } },
+      children
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copier(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector(`[onclick="copier('${id}')"]`);
+    if (btn) { btn.textContent = 'Copié !'; setTimeout(() => btn.textContent = 'Copier', 2000); }
+  });
+}
+
+window.onload = () => {
+  chargerProfil();
+  updateProfileSummary();
+  const today = new Date();
+  document.getElementById('dateSend').value = today.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+};
+</script>
+</body>
+</html>
