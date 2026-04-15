@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CV & Lettre Generator</title>
+<script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#111;--ink2:#444;--ghost:#888;--line:#e0e0e0;
+  --bg:#f4f3f0;--white:#fff;
+  --blue:#1a4fd6;--blue-soft:#eef2fd;
+  --green:#15622e;--green-soft:#f0fdf4;
+  --orange:#c2410c;--orange-soft:#fff7ed;
+  --red:#991b1b;--r:10px;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+.app{display:grid;grid-template-columns:420px 1fr;min-height:100vh}
+
+/* ── Left panel ── */
+.form-panel{background:var(--white);border-right:1px solid var(--line);height:100vh;position:sticky;top:0;overflow-y:auto;display:flex;flex-direction:column}
+.form-header{padding:1.4rem 1.5rem 1rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--white);z-index:20}
+.form-header h1{font-family:'Lora',serif;font-size:1.3rem;font-weight:600;margin-bottom:.2rem}
+.form-header p{font-size:.73rem;color:var(--ghost)}
+.form-body{padding:1.25rem 1.5rem 2rem;flex:1}
+
+/* ── Mode tabs ── */
+.mode-tabs{display:flex;gap:.3rem;margin-bottom:1.25rem;background:var(--bg);border-radius:var(--r);padding:.28rem}
+.mode-tab{flex:1;padding:.5rem .3rem;border:none;background:transparent;border-radius:8px;font-size:.75rem;font-weight:500;cursor:pointer;color:var(--ghost);font-family:inherit;transition:all .15s;white-space:nowrap}
+.mode-tab.active{background:var(--white);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.mode-tab.locked{opacity:.45;cursor:not-allowed;position:relative}
+.mode-tab.locked::after{content:'🔒';font-size:.6rem;position:absolute;top:2px;right:4px}
+.mode-panel{display:none}
+.mode-panel.active{display:block}
+
+/* ── Layout selector ── */
+.layout-selector{margin-bottom:1.1rem}
+.sel-label{font-size:.63rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ghost);margin-bottom:.5rem;display:block}
+.layout-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:.35rem}
+.lc{border:1.5px solid var(--line);border-radius:8px;padding:.45rem .3rem .4rem;cursor:pointer;transition:all .15s;background:var(--white);display:flex;flex-direction:column;align-items:center;gap:.3rem}
+.lc:hover,.lc.active{border-color:var(--blue);background:var(--blue-soft)}
+.lc.active .lc-name{color:var(--blue)}
+.lt{width:40px;height:52px;border-radius:3px;background:#f9f9f9;border:1px solid #ddd;position:relative;overflow:hidden}
+.lt-latex::before{content:'';position:absolute;top:5px;left:4px;right:4px;height:3.5px;background:#111;border-radius:1px}
+.lt-latex::after{content:'';position:absolute;top:13px;left:4px;right:4px;bottom:5px;background:repeating-linear-gradient(to bottom,#ccc 0,#ccc 1.5px,transparent 1.5px,transparent 4.5px)}
+.lt-modern{background:linear-gradient(to right,#1a1a2e 37%,#f9f9f9 37%)}
+.lt-modern::after{content:'';position:absolute;top:4px;left:39%;right:4px;bottom:4px;background:repeating-linear-gradient(to bottom,#ddd 0,#ddd 1.5px,transparent 1.5px,transparent 5px)}
+.lt-minimal::before{content:'';position:absolute;top:6px;left:4px;width:55%;height:2px;background:#111;border-radius:1px}
+.lt-minimal::after{content:'';position:absolute;top:13px;left:4px;right:4px;bottom:5px;background:repeating-linear-gradient(to bottom,#e0e0e0 0,#e0e0e0 1px,transparent 1px,transparent 6.5px)}
+.lt-exec::before{content:'';position:absolute;top:0;left:0;right:0;height:12px;background:#1a3a6b}
+.lt-exec::after{content:'';position:absolute;top:16px;left:4px;right:4px;bottom:5px;background:repeating-linear-gradient(to bottom,#ddd 0,#ddd 1.5px,transparent 1.5px,transparent 5px)}
+.lc-name{font-size:.6rem;font-weight:500;color:var(--ink2);text-align:center}
+
+/* ── Sections / fields ── */
+.section{margin-bottom:1.3rem}
+.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem}
+.sec-title{font-size:.63rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ghost)}
+.add-btn{font-size:.7rem;font-weight:500;color:var(--blue);background:var(--blue-soft);border:none;padding:.22rem .6rem;border-radius:99px;cursor:pointer;font-family:inherit;transition:all .15s}
+.add-btn:hover{background:#d8e4fb}
+.divider{border:none;border-top:1px solid var(--line);margin:1rem 0}
+.field{margin-bottom:.58rem}
+label{display:block;font-size:.7rem;font-weight:500;color:var(--ink2);margin-bottom:.25rem}
+input[type=text],input[type=email],input[type=tel],textarea{width:100%;border:1px solid var(--line);border-radius:7px;padding:.48rem .72rem;font-size:.8rem;font-family:inherit;color:var(--ink);background:var(--white);outline:none;transition:border-color .15s,box-shadow .15s}
+input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,79,214,.08)}
+textarea{resize:vertical;min-height:60px;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+
+/* ── Entry cards ── */
+.entry-card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:.8rem;margin-bottom:.5rem;animation:fi .18s ease}
+@keyframes fi{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.ec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.55rem}
+.ec-num{font-size:.63rem;font-weight:600;color:var(--ghost);text-transform:uppercase;letter-spacing:.05em}
+.rm-btn{width:19px;height:19px;border-radius:50%;background:none;border:1px solid var(--line);color:var(--ghost);cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:inherit}
+.rm-btn:hover{background:#fee2e2;border-color:#fca5a5;color:var(--red)}
+
+/* ── Photo ── */
+.photo-wrap{display:flex;align-items:center;gap:.8rem;padding:.65rem;border:1.5px dashed var(--line);border-radius:var(--r);cursor:pointer;transition:border-color .15s}
+.photo-wrap:hover{border-color:var(--blue)}
+.photo-circle{width:48px;height:48px;border-radius:50%;background:var(--line);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+.photo-circle img{width:100%;height:100%;object-fit:cover}
+.photo-lbl p{font-size:.76rem;font-weight:500;margin-bottom:.1rem}
+.photo-lbl span{font-size:.66rem;color:var(--ghost)}
+#photoInput{display:none}
+
+/* ── Adapter panel ── */
+.adapter-info{background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--r);padding:.75rem 1rem;margin-bottom:1rem;font-size:.76rem;color:#92400e;line-height:1.55}
+.offre-field{margin-bottom:1rem}
+.offre-field textarea{min-height:160px;font-size:.78rem}
+.ai-status{font-size:.76rem;color:var(--ghost);text-align:center;margin:.4rem 0;min-height:18px}
+.spinner{width:13px;height:13px;border:2px solid rgba(0,0,0,.15);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:.35rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Lettre fields ── */
+.lettre-info{background:var(--blue-soft);border-radius:var(--r);padding:.7rem .9rem;margin-bottom:1rem;font-size:.76rem;color:#1044b0;line-height:1.5}
+
+/* ── Buttons ── */
+.actions{display:flex;flex-direction:column;gap:.45rem}
+.btn-primary{width:100%;padding:.72rem;background:var(--ink);color:#fff;border:none;border-radius:var(--r);font-size:.86rem;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:.4rem;transition:opacity .15s,transform .1s}
+.btn-primary:hover{opacity:.85}
+.btn-primary:active{transform:scale(.98)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:.45rem}
+.btn-word{padding:.68rem;background:var(--white);color:var(--green);border:1.5px solid var(--green);border-radius:var(--r);font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;display:none;align-items:center;justify-content:center;gap:.35rem;transition:background .15s}
+.btn-word:hover{background:var(--green-soft)}
+.btn-word.show{display:flex}
+.btn-pdf{padding:.68rem;background:var(--white);color:var(--orange);border:1.5px solid var(--orange);border-radius:var(--r);font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;display:none;align-items:center;justify-content:center;gap:.35rem;transition:background .15s}
+.btn-pdf:hover{background:var(--orange-soft)}
+.btn-pdf.show{display:flex}
+.btn-optimize{width:100%;padding:.72rem;background:linear-gradient(135deg,#1a4fd6,#7c3aed);color:#fff;border:none;border-radius:var(--r);font-size:.86rem;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:.4rem;transition:opacity .15s,transform .1s;position:relative;overflow:hidden}
+.btn-optimize::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,#1540b0,#6d28d9);opacity:0;transition:opacity .15s}
+.btn-optimize:hover::before{opacity:1}
+.btn-optimize:active{transform:scale(.98)}
+.btn-optimize:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-optimize span{position:relative;z-index:1}
+.optimize-banner{background:linear-gradient(135deg,#eef2fd,#f5f3ff);border:1px solid #c4b5fd;border-radius:var(--r);padding:.75rem 1rem;margin-bottom:.75rem;font-size:.76rem;color:#5b21b6;line-height:1.55;display:none}
+.optimize-banner.show{display:block}
+.profile-warning{background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--r);padding:1.25rem 1.25rem;text-align:center;display:none}
+.profile-warning.show{display:block}
+.profile-warning .pw-icon{font-size:1.6rem;margin-bottom:.5rem}
+.profile-warning .pw-title{font-size:.85rem;font-weight:600;color:#92400e;margin-bottom:.4rem}
+.profile-warning .pw-text{font-size:.76rem;color:#b45309;line-height:1.6;margin-bottom:1rem}
+.profile-warning .pw-checklist{text-align:left;margin:0 auto .9rem;display:inline-block}
+.profile-warning .pw-check{font-size:.75rem;line-height:1.8;color:#78350f}
+.profile-warning .pw-check.done{color:#15622e}
+.pw-goto{padding:.55rem 1.2rem;background:#92400e;color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+.pw-goto:hover{background:#78350f}
+.status{font-size:.72rem;color:var(--ghost);text-align:center;min-height:16px;margin-top:.22rem}
+
+/* ── Right panel ── */
+.preview-panel{background:#d8d5cf;padding:1.75rem 1.75rem 3rem;overflow-y:auto;height:100vh;display:flex;flex-direction:column;align-items:center}
+.preview-bar{width:100%;max-width:720px;display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.preview-bar h2{font-size:.63rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#5a5650}
+.preview-badge{font-size:.67rem;font-weight:500;background:rgba(255,255,255,.6);color:var(--ink2);padding:.2rem .6rem;border-radius:99px}
+.cv-doc{width:100%;max-width:720px;background:var(--white);border-radius:3px;box-shadow:0 4px 24px rgba(0,0,0,.1);overflow:hidden;min-height:960px;transition:all .2s}
+.cv-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:600px;color:var(--ghost);text-align:center;padding:2rem;gap:.7rem}
+.cv-empty .ico{font-size:2rem;opacity:.3}
+.cv-empty p{font-size:.78rem;line-height:1.65}
+
+/* ════ LATEX LAYOUT ════ */
+.latex .cv-inner{padding:1.6rem 2.2rem}
+.latex .cv-name{font-size:1.55rem;font-weight:700;letter-spacing:.02em;text-align:center;color:#000;margin-bottom:.25rem}
+.latex .cv-sub{font-size:.74rem;color:#333;text-align:center;margin-bottom:.15rem}
+.latex .cv-sec{margin-bottom:1rem}
+.latex .cv-sec-title{font-size:.65rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#000;border-bottom:1px solid #000;padding-bottom:.18rem;margin-bottom:.55rem}
+.latex .cv-exp{margin-bottom:.6rem}
+.latex .cv-exp-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.08rem}
+.latex .cv-exp-title{font-size:.8rem;font-weight:700;color:#000}
+.latex .cv-exp-date{font-size:.7rem;color:#555}
+.latex .cv-exp-co{font-size:.74rem;color:#333;font-style:italic;margin-bottom:.25rem}
+.latex .cv-exp-desc{font-size:.72rem;color:#222;line-height:1.55;padding-left:.9rem}
+.latex .cv-exp-desc li{margin-bottom:.12rem;list-style:disc}
+.latex .cv-txt{font-size:.74rem;color:#222;line-height:1.65;text-align:justify}
+.latex .cv-list{font-size:.73rem;color:#222;line-height:1.6;padding-left:.9rem}
+.latex .cv-list li{list-style:disc;margin-bottom:.1rem}
+.latex .cv-tworow{display:grid;grid-template-columns:1fr 1fr;gap:0 1.2rem}
+
+/* ════ MODERN LAYOUT ════ */
+.modern{display:flex;min-height:960px}
+.modern .cv-sidebar{width:200px;flex-shrink:0;background:#1e293b;padding:1.5rem 1rem;display:flex;flex-direction:column;gap:1.2rem}
+.modern .cv-main{flex:1;padding:1.5rem 1.4rem;background:var(--white)}
+.modern .cv-photo-wrap{width:80px;height:80px;border-radius:50%;border:2px solid rgba(255,255,255,.15);overflow:hidden;margin:0 auto .7rem;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:1.7rem;color:rgba(255,255,255,.2)}
+.modern .cv-photo-wrap img,.minimal .cv-photo-wrap img,.executive .cv-photo-wrap img,.latex .cv-photo-wrap img{width:100%;height:100%;object-fit:cover}
+.modern .cv-name{font-size:.95rem;font-weight:700;color:#fff;text-align:center;line-height:1.2;margin-bottom:.15rem}
+.modern .cv-title-txt{font-size:.65rem;color:rgba(255,255,255,.5);text-align:center;line-height:1.35}
+.modern .sb-title{font-size:.54rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#60a5fa;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:.25rem;margin-bottom:.5rem}
+.modern .sb-item{font-size:.67rem;color:rgba(255,255,255,.6);margin-bottom:.28rem;line-height:1.4}
+.modern .sb-chip{display:inline-block;font-size:.6rem;background:rgba(255,255,255,.07);color:rgba(255,255,255,.72);padding:.15rem .45rem;border-radius:4px;margin:.1rem .06rem}
+.modern .main-title{font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#1e293b;border-left:3px solid #3b82f6;padding-left:.5rem;margin-bottom:.65rem}
+.modern .main-sec{margin-bottom:1.1rem}
+.modern .cv-exp-row{display:flex;align-items:baseline;justify-content:space-between}
+.modern .cv-exp-title{font-size:.79rem;font-weight:600;color:#1e293b}
+.modern .cv-exp-date{font-size:.65rem;color:var(--ghost)}
+.modern .cv-exp-co{font-size:.7rem;color:#3b82f6;font-weight:500;margin-bottom:.25rem}
+.modern .cv-exp-desc{font-size:.7rem;color:#475569;line-height:1.55}
+.modern .cv-exp-desc li{list-style:disc;margin-left:.8rem;margin-bottom:.1rem}
+
+/* ════ MINIMAL LAYOUT ════ */
+.minimal{padding:2.4rem 3rem}
+.minimal .cv-header{display:flex;align-items:flex-start;gap:1.1rem;margin-bottom:2rem;padding-bottom:1.2rem;border-bottom:1px solid var(--line)}
+.minimal .cv-photo-wrap{width:60px;height:60px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:var(--ghost)}
+.minimal .cv-name{font-family:'Lora',serif;font-size:1.65rem;font-weight:400;color:var(--ink);line-height:1.1;margin-bottom:.2rem}
+.minimal .cv-title-txt{font-size:.77rem;color:var(--ghost);margin-bottom:.5rem}
+.minimal .cv-contacts{display:flex;flex-wrap:wrap;gap:.15rem 1rem}
+.minimal .cv-contact{font-size:.68rem;color:var(--ghost)}
+.minimal .cv-sec{margin-bottom:1.6rem}
+.minimal .cv-sec-title{font-size:.56rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ghost);margin-bottom:.7rem}
+.minimal .cv-exp{display:grid;grid-template-columns:105px 1fr;gap:0 1.1rem;margin-bottom:.9rem}
+.minimal .cv-exp-date{font-size:.66rem;color:var(--ghost);line-height:1.4}
+.minimal .cv-exp-co-s{font-size:.66rem;color:var(--ghost);margin-top:.1rem}
+.minimal .cv-exp-title{font-size:.8rem;font-weight:600;color:var(--ink);margin-bottom:.1rem}
+.minimal .cv-exp-desc{font-size:.71rem;color:#555;line-height:1.6}
+.minimal .cv-exp-desc li{list-style:disc;margin-left:.8rem;margin-bottom:.1rem}
+.minimal .cv-tags{display:flex;flex-wrap:wrap;gap:.3rem}
+.minimal .cv-tag{font-size:.66rem;color:var(--ink2);border:1px solid var(--line);padding:.17rem .52rem;border-radius:3px}
+
+/* ════ EXECUTIVE LAYOUT ════ */
+.executive .cv-header{background:#1a3a6b;padding:1.4rem 2rem;display:flex;align-items:center;gap:1.2rem}
+.executive .cv-photo-wrap{width:72px;height:72px;border-radius:50%;border:2px solid rgba(255,255,255,.22);overflow:hidden;flex-shrink:0;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:rgba(255,255,255,.3)}
+.executive .cv-name{font-size:1.45rem;font-weight:700;color:#fff;line-height:1.2;margin-bottom:.22rem}
+.executive .cv-title-txt{font-size:.75rem;color:rgba(255,255,255,.62);margin-bottom:.55rem}
+.executive .cv-contacts{display:flex;flex-wrap:wrap;gap:.2rem .85rem}
+.executive .cv-contact{font-size:.68rem;color:rgba(255,255,255,.5)}
+.executive .cv-body{padding:1.4rem 2rem}
+.executive .cv-sec{margin-bottom:1.2rem}
+.executive .cv-sec-title{font-size:.61rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#1a3a6b;border-bottom:2px solid #c8d8f0;padding-bottom:.28rem;margin-bottom:.75rem}
+.executive .cv-exp{margin-bottom:.75rem}
+.executive .cv-exp-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.1rem}
+.executive .cv-exp-title{font-size:.82rem;font-weight:600;color:#111}
+.executive .cv-exp-date{font-size:.67rem;color:var(--ghost)}
+.executive .cv-exp-co{font-size:.73rem;color:#1a3a6b;font-weight:500;margin-bottom:.28rem}
+.executive .cv-exp-desc{font-size:.72rem;color:#333;line-height:1.6}
+.executive .cv-exp-desc li{list-style:disc;margin-left:.85rem;margin-bottom:.12rem}
+.executive .cv-chips{display:flex;flex-wrap:wrap;gap:.3rem}
+.executive .cv-chip{font-size:.67rem;font-weight:500;background:#eef2fd;color:#1a3a6b;padding:.18rem .55rem;border-radius:99px}
+.executive .cv-chip-g{background:#f0fdf4;color:#15622e}
+
+/* ════ LETTRE PREVIEW ════ */
+.lettre-preview{padding:2.5rem 2.8rem;font-size:.82rem;line-height:1.85;color:#222}
+.lettre-preview .lp-sender strong{font-size:.9rem;display:block;margin-bottom:.12rem}
+.lettre-preview .lp-dest{text-align:right;margin:1.4rem 0 .8rem;font-size:.78rem;color:#555}
+.lettre-preview .lp-date{text-align:right;font-size:.76rem;color:#666;margin-bottom:1.1rem}
+.lettre-preview .lp-obj{margin-bottom:1.1rem;font-size:.8rem}
+.lettre-preview .lp-body p{text-align:justify;margin-bottom:.85rem}
+
+/* ════ ADAPTER RESULT ════ */
+.adapter-result{padding:2rem 2.2rem;font-size:.82rem;line-height:1.8;color:#222;white-space:pre-wrap}
+.adapter-result h3{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);border-bottom:1.5px solid var(--blue-soft);padding-bottom:.3rem;margin-bottom:.7rem;margin-top:1.1rem;white-space:normal}
+.adapter-result h3:first-child{margin-top:0}
+.adapter-result .exp-block{margin-bottom:.8rem;white-space:normal}
+.adapter-result .exp-title{font-size:.82rem;font-weight:700;color:#111}
+.adapter-result .exp-sub{font-size:.73rem;color:#555;font-style:italic;margin-bottom:.25rem}
+.adapter-result ul{padding-left:1rem;margin-bottom:.4rem}
+.adapter-result li{font-size:.76rem;line-height:1.6;margin-bottom:.12rem;list-style:disc}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+@media(max-width:860px){.app{grid-template-columns:1fr}.form-panel{height:auto;position:relative}.preview-panel{height:auto}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══════════════ FORM PANEL ══════════════ -->
+<div class="form-panel">
+  <div class="form-header">
+    <h1>CV & Lettre Generator</h1>
+    <p>Aperçu en temps réel · 4 layouts · IA intégrée</p>
+  </div>
+  <div class="form-body">
+
+    <div class="mode-tabs">
+      <button class="mode-tab active" onclick="setMode('cv')">📄 Mon CV</button>
+      <button class="mode-tab" onclick="setMode('lettre')">✉ Lettre</button>
+      <button class="mode-tab" id="tabAdapter" onclick="tryAdapter()">✦ Adapter à une offre</button>
+    </div>
+
+    <!-- ══ CV PANEL ══ -->
+    <div class="mode-panel active" id="mp-cv">
+      <div class="layout-selector">
+        <span class="sel-label">Mise en page</span>
+        <div class="layout-cards">
+          <div class="lc active" onclick="setLayout('latex')" id="lc-latex"><div class="lt lt-latex"></div><span class="lc-name">LaTeX</span></div>
+          <div class="lc" onclick="setLayout('modern')" id="lc-modern"><div class="lt lt-modern"></div><span class="lc-name">Moderne</span></div>
+          <div class="lc" onclick="setLayout('minimal')" id="lc-minimal"><div class="lt lt-minimal"></div><span class="lc-name">Minimal</span></div>
+          <div class="lc" onclick="setLayout('executive')" id="lc-exec"><div class="lt lt-exec"></div><span class="lc-name">Executive</span></div>
+        </div>
+      </div>
+      <hr class="divider"/>
+      <div class="section">
+        <div class="sec-header"><span class="sec-title">Photo de profil</span></div>
+        <div class="photo-wrap" onclick="document.getElementById('photoInput').click()">
+          <div class="photo-circle" id="photoCircle">📷</div>
+          <div class="photo-lbl"><p>Ajouter une photo</p><span>JPG, PNG</span></div>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" onchange="handlePhoto(event)"/>
+      </div>
+      <hr class="divider"/>
+      <div class="section">
+        <div class="sec-header"><span class="sec-title">Informations personnelles</span></div>
+        <div class="row2">
+          <div class="field"><label>Prénom</label><input type="text" id="prenom" placeholder="Jean" oninput="render()"/></div>
+          <div class="field"><label>Nom</label><input type="text" id="nom" placeholder="Dupont" oninput="render()"/></div>
+        </div>
+        <div class="field"><label>Titre / Poste recherché</label><input type="text" id="titre" placeholder="Alternant Supply Chain" oninput="render()"/></div>
+        <div class="row2">
+          <div class="field"><label>Email</label><input type="text" id="email" placeholder="jean@email.com" oninput="render()"/></div>
+          <div class="field"><label>Téléphone</label><input type="text" id="tel" placeholder="06 XX XX XX XX" oninput="render()"/></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Ville</label><input type="text" id="ville" placeholder="Paris (75)" oninput="render()"/></div>
+          <div class="field"><label>Permis</label><input type="text" id="permis" placeholder="Permis B" oninput="render()"/></div>
+        </div>
+        <div class="field"><label>Profil / Objectif</label><textarea id="profil" placeholder="2-3 lignes de présentation..." oninput="render()"></textarea></div>
+        <div class="field"><label>Langues</label><input type="text" id="langues" placeholder="Français B2, Anglais C2" oninput="render()"/></div>
+      </div>
+      <hr class="divider"/>
+      <div class="section">
+        <div class="sec-header"><span class="sec-title">Expériences</span><button class="add-btn" onclick="addExp()">+ Ajouter</button></div>
+        <div id="expCont"></div>
+      </div>
+      <hr class="divider"/>
+      <div class="section">
+        <div class="sec-header"><span class="sec-title">Formations</span><button class="add-btn" onclick="addForm()">+ Ajouter</button></div>
+        <div id="formCont"></div>
+      </div>
+      <hr class="divider"/>
+      <div class="section">
+        <div class="sec-header"><span class="sec-title">Compétences & Plus</span></div>
+        <div class="field"><label>Compétences techniques</label><textarea id="competences" placeholder="ex : ERP, WMS, Excel avancé, Power BI..." oninput="render()"></textarea></div>
+        <div class="field"><label>Certifications</label><textarea id="certifications" placeholder="ex : Certification Supply Chain — Coursera&#10;Excel avancé — LinkedIn Learning" oninput="render()"></textarea></div>
+        <div class="field"><label>Atouts</label><input type="text" id="atouts" placeholder="Organisé, autonome, force de proposition" oninput="render()"/></div>
+        <div class="field"><label>Centres d'intérêt</label><input type="text" id="interets" placeholder="Football, vie associative" oninput="render()"/></div>
+      </div>
+      <hr class="divider"/>
+      <hr class="divider"/>
+      <div class="optimize-banner" id="optimizeCVBanner">✦ <strong>CV optimisé par l'IA</strong> — Les descriptions ont été réécrites avec un vocabulaire plus professionnel. Tu peux modifier les champs manuellement si tu veux ajuster.</div>
+      <div class="actions">
+        <button class="btn-optimize" id="btnOptCV" onclick="optimizeCV()">
+          <span id="optCVIcon">✦</span>
+          <span id="optCVTxt">Optimiser mon CV avec l'IA</span>
+        </button>
+        <div class="status" id="statusOptCV"></div>
+        <button class="btn-primary" onclick="save()">💾 Sauvegarder</button>
+        <div class="btn-row">
+          <button class="btn-word show" id="btnWordCV" onclick="exportWordCV()">📄 Word</button>
+          <button class="btn-pdf show" id="btnPdfCV" onclick="exportPdfCV()">📕 PDF</button>
+        </div>
+        <div class="status" id="statusCV"></div>
+      </div>
+    </div>
+
+    <!-- ══ LETTRE PANEL ══ -->
+    <div class="mode-panel" id="mp-lettre">
+      <div class="lettre-info">💡 La lettre utilise automatiquement tes infos de profil.</div>
+      <div class="section">
+        <div class="row2">
+          <div class="field"><label>Ville d'envoi</label><input type="text" id="lVille" placeholder="ex : Lyon" oninput="renderLettre()"/></div>
+          <div class="field"><label>Date</label><input type="text" id="lDate" oninput="renderLettre()"/></div>
+        </div>
+        <div class="field"><label>Entreprise destinataire</label><input type="text" id="lEntreprise" placeholder="Nom de l'entreprise" oninput="renderLettre()"/></div>
+        <div class="field"><label>Poste visé</label><input type="text" id="lPoste" placeholder="Alternant Logistique" oninput="renderLettre()"/></div>
+        <div class="field"><label>Motivation spécifique pour cette entreprise</label><textarea id="lMotiv" rows="3" placeholder="ex : son engagement RSE, sa position de leader..." oninput="renderLettre()"></textarea></div>
+      </div>
+      <hr class="divider"/>
+      <div class="optimize-banner" id="optimizeLettreBanner">✦ <strong>Lettre optimisée par l'IA</strong> — La lettre a été réécrite avec un style plus professionnel et percutant.</div>
+      <div class="actions">
+        <button class="btn-optimize" id="btnOptLettre" onclick="optimizeLettre()">
+          <span id="optLettreIcon">✦</span>
+          <span id="optLettreTxt">Optimiser la lettre avec l'IA</span>
+        </button>
+        <div class="status" id="statusOptLettre"></div>
+        <div class="btn-row">
+          <button class="btn-word show" onclick="exportWordLettre()">📄 Word</button>
+          <button class="btn-pdf show" onclick="exportPdfLettre()">📕 PDF</button>
+        </div>
+        <div class="status" id="statusLettre"></div>
+      </div>
+    </div>
+
+    <!-- ══ ADAPTER PANEL ══ -->
+    <div class="mode-panel" id="mp-adapter">
+
+      <!-- Profile incomplete warning — shown when profile is empty -->
+      <div class="profile-warning" id="profileWarning">
+        <div class="pw-icon">🔒</div>
+        <div class="pw-title">Remplis ton profil d'abord</div>
+        <div class="pw-text">Pour que l'IA génère un CV et une lettre précis et personnalisés, elle a besoin de tes vraies informations.</div>
+        <div class="pw-checklist" id="pwChecklist"></div>
+        <button class="pw-goto" onclick="setMode('cv')">→ Aller remplir mon profil</button>
+      </div>
+
+      <!-- Main adapter content — shown when profile is complete -->
+      <div id="adapterContent">
+      <div class="adapter-info">
+        ✦ <strong>IA intégrée</strong> — Colle une offre d'emploi, l'IA adapte ton CV et génère une lettre de motivation sur mesure en quelques secondes.
+      </div>
+      <div class="offre-field">
+        <label>Offre d'emploi</label>
+        <textarea id="offreText" placeholder="Colle ici le texte complet de l'offre d'emploi..."></textarea>
+      </div>
+      <div class="row2" style="margin-bottom:.8rem">
+        <div class="field"><label>Type de document</label>
+          <select id="adapterType" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:.48rem .72rem;font-size:.8rem;font-family:inherit;outline:none">
+            <option value="cv">CV adapté</option>
+            <option value="lettre">Lettre de motivation</option>
+            <option value="both">Les deux</option>
+          </select>
+        </div>
+        <div class="field"><label>Mise en page CV</label>
+          <select id="adapterLayout" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:.48rem .72rem;font-size:.8rem;font-family:inherit;outline:none">
+            <option value="latex">LaTeX</option>
+            <option value="modern">Moderne</option>
+            <option value="minimal">Minimal</option>
+            <option value="executive">Executive</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-primary" id="btnAdapt" onclick="adapterIA()">
+        <span id="adaptIcon">✦</span>
+        <span id="adaptTxt">Adapter avec l'IA</span>
+      </button>
+      <div class="ai-status" id="aiStatus"></div>
+      <div id="adapterActions" style="display:none;margin-top:.6rem">
+        <div class="btn-row">
+          <button class="btn-word show" onclick="exportAdapterWord()">📄 Télécharger Word</button>
+          <button class="btn-pdf show" onclick="exportAdapterPdf()">📕 Télécharger PDF</button>
+        </div>
+      </div>
+      </div><!-- end adapterContent -->
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ PREVIEW PANEL ══════════════ -->
+<div class="preview-panel">
+  <div class="preview-bar">
+    <h2>Aperçu</h2>
+    <span class="preview-badge" id="previewBadge">LaTeX Classique</span>
+  </div>
+  <div class="cv-doc" id="cvDoc">
+    <div class="cv-empty"><div class="ico">📄</div><p>Remplis le formulaire à gauche<br>pour voir ton CV apparaître ici.</p></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+/* ═══ CONFIG ═══ */
+const GROQ_KEY = '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';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const STORE = 'cv_v6';
+
+/* ═══ STATE ═══ */
+let layout = 'latex', mode = 'cv', photo = null;
+let expCnt = 0, formCnt = 0;
+let adapterResult = { cv: '', lettre: '' };
+const layoutNames = {latex:'LaTeX Classique',modern:'Moderne',minimal:'Minimal',executive:'Executive'};
+
+/* ═══ PROFILE CHECK ═══ */
+function checkProfile() {
+  const d=getData();
+  const checks=[
+    {label:'Prénom et Nom', done:!!(d.prenom&&d.nom)},
+    {label:'Au moins 1 expérience avec description', done:d.exps.some(e=>e.title&&e.desc&&e.desc.trim().length>10)},
+    {label:'Au moins 1 formation', done:d.frms.some(f=>f.degree&&f.school)},
+    {label:'Compétences techniques', done:!!(d.competences&&d.competences.trim().length>5)},
+  ];
+  const allDone=checks.every(c=>c.done);
+  return {checks,allDone,score:checks.filter(c=>c.done).length};
+}
+
+function tryAdapter() {
+  const {checks,allDone}=checkProfile();
+  // Always switch to adapter mode
+  setMode('adapter');
+  const warning=document.getElementById('profileWarning');
+  const content=document.getElementById('adapterContent');
+  const tab=document.getElementById('tabAdapter');
+
+  if(allDone){
+    warning.classList.remove('show');
+    content.style.display='block';
+    tab.classList.remove('locked');
+  } else {
+    warning.classList.add('show');
+    content.style.display='none';
+    tab.classList.add('locked');
+    // Build checklist
+    const list=checks.map(c=>`<div class="pw-check ${c.done?'done':''}">${c.done?'✅':'⬜'} ${c.label}</div>`).join('');
+    document.getElementById('pwChecklist').innerHTML=list;
+    // Show in preview too
+    document.getElementById('cvDoc').innerHTML=`<div class="cv-empty">
+      <div class="ico">🔒</div>
+      <p style="font-weight:600;margin-bottom:.5rem">Profil incomplet</p>
+      <p>Remplis ton profil dans l'onglet<br><strong>📄 Mon CV</strong> avant d'utiliser<br>l'adaptation IA.</p>
+    </div>`;
+  }
+}
+
+/* ═══ MODE / LAYOUT ═══ */
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-tab').forEach((t,i)=>t.classList.toggle('active',i===['cv','lettre','adapter'].indexOf(m)));
+  ['cv','lettre','adapter'].forEach(p=>document.getElementById('mp-'+p).classList.toggle('active',p===m));
+  document.getElementById('previewBadge').textContent = m==='cv'?layoutNames[layout]:m==='lettre'?'Lettre de motivation':'Adapter à une offre';
+  if(m==='cv')render(); else if(m==='lettre')renderLettre(); else renderAdapterEmpty();
+}
+
+function setLayout(l) {
+  layout=l;
+  document.querySelectorAll('.lc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('lc-'+l).classList.add('active');
+  document.getElementById('previewBadge').textContent=layoutNames[l];
+  render();
+}
+
+/* ═══ PHOTO ═══ */
+function handlePhoto(e) {
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader(); r.onload=ev=>{photo=ev.target.result;document.getElementById('photoCircle').innerHTML=`<img src="${photo}"/>`;render();};r.readAsDataURL(f);
+}
+
+/* ═══ DYNAMIC CARDS ═══ */
+function addExp(d={}) {
+  const id=++expCnt,el=document.createElement('div');el.className='entry-card';el.id='exp-'+id;
+  el.innerHTML=`<div class="ec-header"><span class="ec-num">Expérience ${id}</span><button class="rm-btn" onclick="rm('exp-${id}')">×</button></div>
+    <div class="field"><label>Poste</label><input type="text" placeholder="Supply Chain Technicien" value="${d.title||''}" data-e="${id}" data-f="title" oninput="render()"/></div>
+    <div class="field"><label>Entreprise</label><input type="text" placeholder="ex : Entreprise XYZ" value="${d.company||''}" data-e="${id}" data-f="company" oninput="render()"/></div>
+    <div class="row2">
+      <div class="field"><label>Lieu</label><input type="text" placeholder="Paris" value="${d.loc||''}" data-e="${id}" data-f="loc" oninput="render()"/></div>
+      <div class="field"><label>Période</label><input type="text" placeholder="Jan 2024 — Août 2024" value="${d.dates||''}" data-e="${id}" data-f="dates" oninput="render()"/></div>
+    </div>
+    <div class="field"><label>Description</label><textarea placeholder="- Gestion des stocks et suivi des flux&#10;- Coordination avec les fournisseurs" data-e="${id}" data-f="desc" oninput="render()">${d.desc||''}</textarea></div>`;
+  document.getElementById('expCont').appendChild(el);render();
+}
+
+function addForm(d={}) {
+  const id=++formCnt,el=document.createElement('div');el.className='entry-card';el.id='frm-'+id;
+  el.innerHTML=`<div class="ec-header"><span class="ec-num">Formation ${id}</span><button class="rm-btn" onclick="rm('frm-${id}')">×</button></div>
+    <div class="field"><label>Diplôme</label><input type="text" placeholder="Mastère Logistique" value="${d.degree||''}" data-frm="${id}" data-f="degree" oninput="render()"/></div>
+    <div class="field"><label>École</label><input type="text" placeholder="ex : Université de Lyon, France" value="${d.school||''}" data-frm="${id}" data-f="school" oninput="render()"/></div>
+    <div class="row2">
+      <div class="field"><label>Période</label><input type="text" placeholder="2025 – en cours" value="${d.dates||''}" data-frm="${id}" data-f="dates" oninput="render()"/></div>
+      <div class="field"><label>Mention</label><input type="text" placeholder="Mention Bien" value="${d.mention||''}" data-frm="${id}" data-f="mention" oninput="render()"/></div>
+    </div>`;
+  document.getElementById('formCont').appendChild(el);render();
+}
+
+function rm(id){const el=document.getElementById(id);if(!el)return;el.style.cssText='opacity:0;transform:translateY(-5px);transition:all .14s';setTimeout(()=>{el.remove();render();},140);}
+
+/* ═══ DATA ═══ */
+function getData() {
+  const g=id=>(document.getElementById(id)||{}).value||'';
+  const exps=[],frms=[];
+  document.querySelectorAll('[data-e]').forEach(el=>{const i=+el.dataset.e-1;if(!exps[i])exps[i]={};exps[i][el.dataset.f]=el.value;});
+  document.querySelectorAll('[data-frm]').forEach(el=>{const i=+el.dataset.frm-1;if(!frms[i])frms[i]={};frms[i][el.dataset.f]=el.value;});
+  return {prenom:g('prenom'),nom:g('nom'),titre:g('titre'),email:g('email'),tel:g('tel'),ville:g('ville'),permis:g('permis'),profil:g('profil'),langues:g('langues'),competences:g('competences'),certifications:g('certifications'),atouts:g('atouts'),interets:g('interets'),exps:exps.filter(Boolean),frms:frms.filter(Boolean),photo,layout,lVille:g('lVille'),lDate:g('lDate'),lEntreprise:g('lEntreprise'),lPoste:g('lPoste'),lMotiv:g('lMotiv')};
+}
+
+function buildCVText(d) {
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ')||'Le candidat';
+  return `NOM: ${nom}\nCONTACT: ${[d.ville,d.tel,d.email,d.permis].filter(Boolean).join(' | ')}\nTITRE: ${d.titre||''}\nPROFIL: ${d.profil||''}\n\nEXPERIENCES:\n${d.exps.map(e=>`- ${e.title||''} chez ${e.company||''} (${e.loc||''}, ${e.dates||''})\n${(e.desc||'').split('\n').filter(l=>l.trim()).map(l=>'  '+l).join('\n')}`).join('\n\n')}\n\nFORMATIONS:\n${d.frms.map(f=>`- ${f.degree||''} | ${f.school||''} (${f.dates||''})`).join('\n')}\n\nCOMPETENCES: ${d.competences||''}\nCERTIFICATIONS:\n${d.certifications||''}\nLANGUES: ${d.langues||''}\nATOUTS: ${d.atouts||''}\nINTERETS: ${d.interets||''}`;
+}
+
+/* ═══ HELPERS ═══ */
+const ph=(cls,fb='📷')=>photo?`<div class="${cls}"><img src="${photo}"/></div>`:`<div class="${cls}">${fb}</div>`;
+function descUL(desc){if(!desc||!desc.trim())return '';const ls=desc.split('\n').map(l=>l.replace(/^[-•]\s*/,'').trim()).filter(Boolean);return `<ul>${ls.map(l=>`<li>${l}</li>`).join('')}</ul>`;}
+
+/* ═══ RENDER ═══ */
+function render(){
+  // Update adapter tab lock state in real time
+  const {allDone}=checkProfile();
+  const tab=document.getElementById('tabAdapter');
+  if(tab) tab.classList.toggle('locked',!allDone);
+
+  if(mode==='lettre'){renderLettre();return;}
+  if(mode==='adapter'){renderAdapterEmpty();return;}
+  const d=getData(),doc=document.getElementById('cvDoc');
+  const has=d.prenom||d.nom||d.exps.length||d.frms.length;
+  if(!has){doc.innerHTML=`<div class="cv-empty"><div class="ico">📄</div><p>Remplis le formulaire à gauche<br>pour voir ton CV apparaître ici.</p></div>`;return;}
+  const fns={latex:renderLatex,modern:renderModern,minimal:renderMinimal,executive:renderExecutive};
+  doc.innerHTML=fns[layout](d);
+}
+
+/* ═══ LAYOUT RENDERERS ═══ */
+function renderLatex(d){
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ');
+  const contact=[d.ville,d.tel,d.email,d.permis].filter(Boolean).join(' — ');
+  const expsH=d.exps.map(e=>`<div class="cv-exp"><div class="cv-exp-row"><span class="cv-exp-title">${e.title||''}</span><span class="cv-exp-date">${e.dates||''}</span></div><div class="cv-exp-co">${[e.company,e.loc].filter(Boolean).join(' — ')}</div>${e.desc?`<div class="cv-exp-desc">${descUL(e.desc)}</div>`:''}</div>`).join('');
+  const frmsH=d.frms.map(f=>`<div class="cv-exp"><div class="cv-exp-row"><span class="cv-exp-title">${f.degree||''}</span><span class="cv-exp-date">${f.dates||''}</span></div><div class="cv-exp-co">${[f.school,f.mention].filter(Boolean).join(' — ')}</div></div>`).join('');
+  const compL=(d.competences||'').split(/[,\n]/).map(s=>s.trim()).filter(Boolean).map(s=>`<li>${s}</li>`).join('');
+  const certL=(d.certifications||'').split('\n').map(s=>s.replace(/^[-•]\s*/,'').trim()).filter(Boolean).map(s=>`<li>${s}</li>`).join('');
+  const bottom=[d.langues&&`<strong>Langues :</strong> ${d.langues}`,d.atouts&&`<strong>Atouts :</strong> ${d.atouts}`,d.interets&&`<strong>Intérêts :</strong> ${d.interets}`].filter(Boolean);
+  return `<div class="latex"><div class="cv-inner">
+    <div class="cv-name">${nom||'Votre Nom'}</div>
+    ${contact?`<div class="cv-sub">${contact}</div>`:''}
+    ${d.titre?`<div class="cv-sub">${d.titre}</div>`:''}
+    ${d.profil?`<div class="cv-sec"><div class="cv-sec-title">Profil</div><p class="cv-txt">${d.profil}</p></div>`:''}
+    ${d.exps.length?`<div class="cv-sec"><div class="cv-sec-title">Expériences professionnelles</div>${expsH}</div>`:''}
+    ${d.frms.length?`<div class="cv-sec"><div class="cv-sec-title">Formation</div>${frmsH}</div>`:''}
+    ${compL?`<div class="cv-sec"><div class="cv-sec-title">Compétences</div><ul class="cv-list">${compL}</ul></div>`:''}
+    ${certL?`<div class="cv-sec"><div class="cv-sec-title">Certifications</div><ul class="cv-list">${certL}</ul></div>`:''}
+    ${bottom.length?`<div class="cv-sec"><div class="cv-sec-title">Informations</div>${bottom.map(b=>`<p class="cv-txt" style="margin-bottom:.15rem">${b}</p>`).join('')}</div>`:''}
+  </div></div>`;}
+
+function renderModern(d){
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ');
+  const contacts=[d.ville,d.tel,d.email,d.permis].filter(Boolean).map(c=>`<div class="sb-item">${c}</div>`).join('');
+  const compChips=(d.competences||'').split(/[,\n]/).map(s=>s.trim()).filter(Boolean).map(s=>`<span class="sb-chip">${s}</span>`).join('');
+  const certLines=(d.certifications||'').split('\n').map(s=>s.replace(/^[-•]\s*/,'').trim()).filter(Boolean).map(s=>`<div class="sb-item">✓ ${s}</div>`).join('');
+  const expsH=d.exps.map(e=>`<div style="margin-bottom:.7rem"><div class="cv-exp-row"><span class="cv-exp-title">${e.title||''}</span><span class="cv-exp-date">${e.dates||''}</span></div><div class="cv-exp-co">${[e.company,e.loc].filter(Boolean).join(' — ')}</div>${e.desc?`<div class="cv-exp-desc">${descUL(e.desc)}</div>`:''}</div>`).join('');
+  const frmsH=d.frms.map(f=>`<div style="margin-bottom:.6rem"><div class="cv-exp-row"><span class="cv-exp-title">${f.degree||''}</span><span class="cv-exp-date">${f.dates||''}</span></div><div class="cv-exp-co">${[f.school,f.mention].filter(Boolean).join(' — ')}</div></div>`).join('');
+  return `<div class="modern"><div class="cv-sidebar">${ph('cv-photo-wrap')}<div class="cv-name">${nom||'Votre Nom'}</div>${d.titre?`<div class="cv-title-txt">${d.titre}</div>`:''} ${contacts?`<div><div class="sb-title">Contact</div>${contacts}</div>`:''} ${d.langues?`<div><div class="sb-title">Langues</div><div class="sb-item">${d.langues}</div></div>`:''} ${compChips?`<div><div class="sb-title">Compétences</div>${compChips}</div>`:''} ${d.atouts?`<div><div class="sb-title">Atouts</div><div class="sb-item">${d.atouts}</div></div>`:''} ${d.interets?`<div><div class="sb-title">Intérêts</div><div class="sb-item">${d.interets}</div></div>`:''}</div>
+  <div class="cv-main">${d.profil?`<div class="main-sec"><div class="main-title">Profil</div><p style="font-size:.76rem;color:#475569;line-height:1.65">${d.profil}</p></div>`:''} ${d.exps.length?`<div class="main-sec"><div class="main-title">Expériences</div>${expsH}</div>`:''} ${d.frms.length?`<div class="main-sec"><div class="main-title">Formations</div>${frmsH}</div>`:''} ${certLines?`<div class="main-sec"><div class="main-title">Certifications</div>${certLines}</div>`:''}</div></div>`;}
+
+function renderMinimal(d){
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ');
+  const contacts=[d.ville,d.tel,d.email,d.permis].filter(Boolean).map(c=>`<span class="cv-contact">${c}</span>`).join('');
+  const expsH=d.exps.map(e=>`<div class="cv-exp"><div><div class="cv-exp-date">${e.dates||''}</div><div class="cv-exp-co-s">${[e.company,e.loc].filter(Boolean).join('<br>')}</div></div><div><div class="cv-exp-title">${e.title||''}</div>${e.desc?`<div class="cv-exp-desc">${descUL(e.desc)}</div>`:''}</div></div>`).join('');
+  const frmsH=d.frms.map(f=>`<div class="cv-exp"><div><div class="cv-exp-date">${f.dates||''}</div><div class="cv-exp-co-s">${f.school||''}</div></div><div><div class="cv-exp-title">${f.degree||''}</div>${f.mention?`<div class="cv-exp-desc">${f.mention}</div>`:''}</div></div>`).join('');
+  const compTags=(d.competences||'').split(/[,\n]/).map(s=>s.trim()).filter(Boolean).map(s=>`<span class="cv-tag">${s}</span>`).join('');
+  const certTags=(d.certifications||'').split('\n').map(s=>s.replace(/^[-•]\s*/,'').trim()).filter(Boolean).map(s=>`<span class="cv-tag">${s}</span>`).join('');
+  return `<div class="minimal"><div class="cv-header">${ph('cv-photo-wrap')}<div><div class="cv-name">${nom||'Votre Nom'}</div>${d.titre?`<div class="cv-title-txt">${d.titre}</div>`:''}<div class="cv-contacts">${contacts}</div></div></div>
+  ${d.profil?`<div class="cv-sec"><div class="cv-sec-title">Profil</div><p style="font-size:.76rem;color:#555;line-height:1.65">${d.profil}</p></div>`:''}
+  ${d.exps.length?`<div class="cv-sec"><div class="cv-sec-title">Expériences</div>${expsH}</div>`:''}
+  ${d.frms.length?`<div class="cv-sec"><div class="cv-sec-title">Formations</div>${frmsH}</div>`:''}
+  ${compTags?`<div class="cv-sec"><div class="cv-sec-title">Compétences</div><div class="cv-tags">${compTags}</div></div>`:''}
+  ${certTags?`<div class="cv-sec"><div class="cv-sec-title">Certifications</div><div class="cv-tags">${certTags}</div></div>`:''}
+  ${(d.langues||d.atouts)?`<div class="cv-sec"><div class="cv-sec-title">Informations</div>${d.langues?`<div class="cv-exp"><div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ghost)">Langues</div><div style="font-size:.76rem;color:#555">${d.langues}</div></div>`:''} ${d.atouts?`<div class="cv-exp"><div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ghost)">Atouts</div><div style="font-size:.76rem;color:#555">${d.atouts}</div></div>`:''}</div>`:''}</div>`;}
+
+function renderExecutive(d){
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ');
+  const contacts=[d.ville,d.tel,d.email,d.permis].filter(Boolean).map(c=>`<span class="cv-contact">${c}</span>`).join('');
+  const expsH=d.exps.map(e=>`<div class="cv-exp"><div class="cv-exp-row"><span class="cv-exp-title">${e.title||''}</span><span class="cv-exp-date">${e.dates||''}</span></div><div class="cv-exp-co">${[e.company,e.loc].filter(Boolean).join(' — ')}</div>${e.desc?`<div class="cv-exp-desc">${descUL(e.desc)}</div>`:''}</div>`).join('');
+  const frmsH=d.frms.map(f=>`<div class="cv-exp"><div class="cv-exp-row"><span class="cv-exp-title">${f.degree||''}</span><span class="cv-exp-date">${f.dates||''}</span></div><div class="cv-exp-co">${[f.school,f.mention].filter(Boolean).join(' — ')}</div></div>`).join('');
+  const compChips=(d.competences||'').split(/[,\n]/).map(s=>s.trim()).filter(Boolean).map(s=>`<span class="cv-chip">${s}</span>`).join('');
+  const certChips=(d.certifications||'').split('\n').map(s=>s.replace(/^[-•]\s*/,'').trim()).filter(Boolean).map(s=>`<span class="cv-chip cv-chip-g">${s}</span>`).join('');
+  const bottom=[d.atouts&&`<strong>Atouts :</strong> ${d.atouts}`,d.langues&&`<strong>Langues :</strong> ${d.langues}`,d.interets&&`<strong>Intérêts :</strong> ${d.interets}`].filter(Boolean);
+  return `<div class="executive"><div class="cv-header">${ph('cv-photo-wrap')}<div><div class="cv-name">${nom||'Votre Nom'}</div>${d.titre?`<div class="cv-title-txt">${d.titre}</div>`:''}<div class="cv-contacts">${contacts}</div></div></div>
+  <div class="cv-body">${d.profil?`<div class="cv-sec"><div class="cv-sec-title">Profil</div><p style="font-size:.76rem;color:#333;line-height:1.65;text-align:justify">${d.profil}</p></div>`:''}
+  ${d.exps.length?`<div class="cv-sec"><div class="cv-sec-title">Expériences professionnelles</div>${expsH}</div>`:''}
+  ${d.frms.length?`<div class="cv-sec"><div class="cv-sec-title">Formations</div>${frmsH}</div>`:''}
+  ${compChips?`<div class="cv-sec"><div class="cv-sec-title">Compétences</div><div class="cv-chips">${compChips}</div></div>`:''}
+  ${certChips?`<div class="cv-sec"><div class="cv-sec-title">Certifications</div><div class="cv-chips">${certChips}</div></div>`:''}
+  ${bottom.length?`<div class="cv-sec"><div class="cv-sec-title">Informations complémentaires</div>${bottom.map(b=>`<p style="font-size:.75rem;color:#333;line-height:1.65;margin-bottom:.18rem">${b}</p>`).join('')}</div>`:''}</div></div>`;}
+
+/* ═══ LETTRE RENDERER ═══ */
+function renderLettre(){
+  const d=getData(),doc=document.getElementById('cvDoc');
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ')||'[Votre Nom]';
+  const contact=[d.ville,d.tel,d.email].filter(Boolean).join('  ·  ');
+  const exp1=d.exps[0]||{};
+  const certList=(d.certifications||'').split('\n').filter(s=>s.trim()).map(s=>s.replace(/^[-•]\s*/,'')).join(', ');
+  const poste=d.lPoste||'alternance en Logistique / Supply Chain';
+  const motiv=d.lMotiv?`Votre entreprise retient particulièrement mon attention pour ${d.lMotiv.trim()}. Je suis convaincu que votre environnement me permettrait d'apporter une contribution opérationnelle réelle dès le début de mon alternance.`:`Votre entreprise retient particulièrement mon attention pour son positionnement dans le secteur et les valeurs qu'elle porte. Je suis convaincu que votre environnement me permettrait d'apporter une contribution opérationnelle réelle dès le début de mon alternance.`;
+  const para2=exp1.title?`Mon expérience la plus significative est celle de ${exp1.title}${exp1.company?' chez '+exp1.company:''}${exp1.dates?', sur une période de '+exp1.dates:''}. J'y ai développé des compétences concrètes en gestion des flux, coordination multi-interlocuteurs et analyse terrain — compétences directement transposables aux missions d'un poste comme le vôtre.`:"Au cours de ma formation et de mes stages, j'ai développé des compétences concrètes en gestion des stocks, coordination logistique et analyse de flux, que je souhaite désormais approfondir en entreprise.";
+  const para3=`Ma formation m'a apporté de solides bases en amélioration continue et en gestion de projet. ${d.competences?`Je maîtrise les principaux outils du secteur (${d.competences.split(/[,\n]/)[0].trim()}, etc.).`:''} ${certList?`J'ai complété mon parcours par des certifications : ${certList}.`:''}`;
+  doc.innerHTML=`<div class="lettre-preview">
+    <div class="lp-sender"><strong>${nom}</strong><span style="font-size:.76rem;color:#555">${d.titre||''}</span><br/><span style="font-size:.76rem;color:#555">${contact}</span></div>
+    <div class="lp-dest"><strong>${d.lEntreprise||'[Entreprise]'}</strong><br/>Service Ressources Humaines<br/>${d.lVille||'[Ville]'}</div>
+    <div class="lp-date">${d.lVille||'[Ville]'}, le ${d.lDate||new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</div>
+    <div class="lp-obj"><strong>Objet : Candidature — ${poste}</strong></div>
+    <div class="lp-body">
+      <p>Madame, Monsieur,</p>
+      <p>Actuellement étudiant${d.titre?` en ${d.titre}`:''}, je suis à la recherche d'une ${poste} à compter de la rentrée prochaine. Fortement attiré par les métiers opérationnels de la supply chain, je me permets de vous soumettre ma candidature avec un vif intérêt pour rejoindre vos équipes.</p>
+      <p>${para2}</p><p>${para3}</p><p>${motiv}</p>
+      <p>Disponible pour un entretien à votre convenance, je reste à votre disposition pour tout complément d'information. Dans l'attente de votre retour, je vous adresse mes meilleures salutations.</p>
+    </div>
+    <div class="lp-sign"><p>Bien cordialement,</p><p style="margin-top:1.4rem;font-weight:600">${nom}</p></div>
+  </div>`;}
+
+/* ═══ ADAPTER EMPTY ═══ */
+function renderAdapterEmpty(){
+  const {checks,allDone,score}=checkProfile();
+  if(allDone){
+    document.getElementById('cvDoc').innerHTML=`<div class="cv-empty"><div class="ico">✦</div><p>Colle une offre d'emploi dans le<br>panneau gauche et clique sur<br><strong>"Adapter avec l'IA"</strong></p></div>`;
+  } else {
+    const list=checks.map(c=>`<div style="font-size:.76rem;line-height:1.9;color:${c.done?'#15622e':'#b45309'}">${c.done?'✅':'⬜'} ${c.label}</div>`).join('');
+    document.getElementById('cvDoc').innerHTML=`<div class="cv-empty" style="align-items:flex-start;padding:2rem 2.5rem;text-align:left">
+      <div style="font-size:1.5rem;margin-bottom:.75rem;align-self:center">🔒</div>
+      <p style="font-weight:600;font-size:.88rem;margin-bottom:.4rem;align-self:center">Complète ton profil d'abord</p>
+      <p style="font-size:.76rem;color:var(--ghost);margin-bottom:1.25rem;text-align:center;align-self:center">${score}/4 champs complétés</p>
+      <div style="width:100%;background:var(--line);border-radius:99px;height:6px;margin-bottom:1.5rem">
+        <div style="background:var(--blue);width:${score*25}%;height:6px;border-radius:99px;transition:width .3s"></div>
+      </div>
+      ${list}
+    </div>`;
+  }
+}
+
+/* ═══ GROQ AI ADAPTER ═══ */
+async function adapterIA() {
+  // Double-check profile is complete before running
+  const {allDone}=checkProfile();
+  if(!allDone){tryAdapter();return;}
+
+  const offre=(document.getElementById('offreText').value||'').trim();
+  if(!offre){document.getElementById('aiStatus').textContent='Merci de coller le texte de l\'offre.';return;}
+  const d=getData();
+  const type=document.getElementById('adapterType').value;
+  const lyt=document.getElementById('adapterLayout').value;
+  const cvText=buildCVText(d);
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ')||'Le candidat';
+
+  const btn=document.getElementById('btnAdapt'),icon=document.getElementById('adaptIcon'),txt=document.getElementById('adaptTxt'),status=document.getElementById('aiStatus');
+  btn.disabled=true;icon.innerHTML='<span class="spinner"></span>';txt.textContent='L\'IA travaille...';status.textContent='Génération en cours...';
+  document.getElementById('adapterActions').style.display='none';
+  adapterResult={cv:'',lettre:''};
+
+  try {
+    if(type==='cv'||type==='both') {
+      const cvPrompt=`Tu es expert en optimisation de CV pour le recrutement en France.
+CV du candidat:\n${cvText}\n\nOffre d'emploi:\n${offre}\n\nAdapte le CV en gardant EXACTEMENT cette structure avec ces titres en majuscules:
+PROFIL\nEXPERIENCES PROFESSIONNELLES\nFORMATION\nCOMPETENCES\nCERTIFICATIONS\nLANGUES\nATOUTS\n\nRègles: reformule avec mots-clés de l'offre, inclus TOUTES les certifications et atouts, ne rien inventer. Réponds UNIQUEMENT avec le CV structuré, rien d'autre.`;
+      const r1=await groq(cvPrompt);
+      adapterResult.cv=r1||'';
+    }
+    if(type==='lettre'||type==='both') {
+      const exp1=d.exps[0]||{};
+      const certList=(d.certifications||'').split('\n').filter(s=>s.trim()).map(s=>s.replace(/^[-•]\s*/,'')).join(', ');
+      const lPrompt=`Tu es expert en rédaction de lettres de motivation professionnelles en français.
+CV du candidat:\n${cvText}\n\nOffre d'emploi:\n${offre}\n\nRédige une lettre de motivation professionnelle percutante:
+- 4-5 paragraphes en prose fluide, pas de bullet points
+- Accroche ciblée sur les missions exactes de l'offre
+- Expérience la plus pertinente mise en avant avec faits concrets
+- Certifications mentionnées si pertinentes
+- Atouts reliés au profil recherché
+- Motivation sincère pour cette entreprise spécifique
+- En-tête: ${nom}, date aujourd'hui, entreprise de l'offre, objet précis
+- Corps 350-420 mots max, formule de politesse
+Réponds UNIQUEMENT avec la lettre complète, rien d'autre.`;
+      const r2=await groq(lPrompt);
+      adapterResult.lettre=r2||'';
+    }
+
+    // Show result in preview
+    if(type==='both') {
+      renderAdapterBoth(lyt);
+    } else if(type==='cv') {
+      renderAdapterCV(adapterResult.cv,lyt);
+    } else {
+      renderAdapterLettre(adapterResult.lettre);
+    }
+
+    status.textContent='✓ Généré avec succès !';
+    document.getElementById('adapterActions').style.display='block';
+
+  } catch(e) {
+    status.textContent='Erreur de connexion. Réessaie.';
+  } finally {
+    btn.disabled=false;icon.textContent='✦';txt.textContent='Adapter avec l\'IA';
+  }
+}
+
+async function groq(prompt) {
+  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${GROQ_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:GROQ_MODEL,messages:[{role:'user',content:prompt}],max_tokens:1400,temperature:.65})});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error?.message||'Erreur API');
+  return data.choices?.[0]?.message?.content||'';
+}
+
+function renderAdapterCV(text,lyt){
+  // Parse AI text and render in chosen layout
+  const doc=document.getElementById('cvDoc');
+  doc.innerHTML=`<div class="adapter-result">${formatAdapterCV(text)}</div>`;
+}
+
+function renderAdapterLettre(text){
+  document.getElementById('cvDoc').innerHTML=`<div class="adapter-result" style="padding:2.5rem 2.8rem;white-space:normal;font-size:.83rem;line-height:1.85;color:#222">${text.replace(/\n\n/g,'</p><p style="text-align:justify;margin-bottom:.85rem">').replace(/\n/g,'<br/>')}</div>`;
+}
+
+function renderAdapterBoth(lyt){
+  document.getElementById('cvDoc').innerHTML=`
+    <div style="padding:1.5rem 2rem;border-bottom:2px solid #eef2fd">
+      <div style="font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:.8rem">CV adapté</div>
+      <div class="adapter-result" style="padding:0">${formatAdapterCV(adapterResult.cv)}</div>
+    </div>
+    <div style="padding:1.5rem 2rem">
+      <div style="font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:.8rem">Lettre de motivation</div>
+      <div style="font-size:.82rem;line-height:1.85;color:#222;white-space:normal">${adapterResult.lettre.replace(/\n\n/g,'</p><p style="margin-bottom:.8rem;text-align:justify">').replace(/\n/g,'<br/>')}</div>
+    </div>`;}
+
+function formatAdapterCV(text){
+  // Convert uppercase section titles to styled headers
+  return text.split('\n').map(line=>{
+    const t=line.trim();
+    if(t===t.toUpperCase()&&t.length>2&&t.length<60&&/[A-Z]/.test(t)&&!t.startsWith('-')&&!t.startsWith('•')){
+      return `<h3>${t}</h3>`;
+    } else if(t.startsWith('-')||t.startsWith('•')){
+      return `<li>${t.replace(/^[-•]\s*/,'')}</li>`;
+    } else if(t.length===0){
+      return '</ul><br/>';
+    }
+    return `<span style="display:block;font-size:.81rem;color:#222;margin:.1rem 0">${t}</span>`;
+  }).join('');
+}
+
+/* ═══ SAVE / LOAD ═══ */
+function save(){
+  const d=getData();localStorage.setItem(STORE,JSON.stringify(d));
+  const s=document.getElementById('statusCV');s.style.color='#15622e';s.textContent='✓ Sauvegardé !';setTimeout(()=>{s.textContent='';},2500);
+}
+function load(){
+  const raw=localStorage.getItem(STORE);if(!raw)return;
+  const d=JSON.parse(raw);
+  const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
+  ['prenom','nom','titre','email','tel','ville','permis','profil','langues','competences','certifications','atouts','interets','lVille','lDate','lEntreprise','lPoste','lMotiv'].forEach(k=>set(k,d[k]));
+  if(d.photo){photo=d.photo;document.getElementById('photoCircle').innerHTML=`<img src="${d.photo}"/>`;}
+  if(d.layout)setLayout(d.layout);
+  (d.exps||[]).forEach(e=>addExp(e));(d.frms||[]).forEach(f=>addForm(f));render();
+}
+
+/* ═══ WORD EXPORT ═══ */
+async function exportWordCV(){await _exportWord('cv',getData());}
+async function exportWordLettre(){
+  if(optimizedLettreText){await _exportWordText(optimizedLettreText,'Lettre_Motivation');return;}
+  await _exportWord('lettre',getData());
+}
+async function exportAdapterWord(){
+  const type=document.getElementById('adapterType').value;
+  const d=getData();
+  if(type==='both'||type==='cv') await _exportWordText(adapterResult.cv,'CV_Adapte');
+  if(type==='both'||type==='lettre') await _exportWordText(adapterResult.lettre,'Lettre_Adaptee');
+}
+
+async function _exportWord(type,d){
+  const {Document,Packer,Paragraph,TextRun,AlignmentType,BorderStyle,UnderlineType}=docx;
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ')||'CV';
+  const GREY='666666',DARK='111111',BLUE='1a4fd6';
+  const h=t=>new Paragraph({spacing:{before:240,after:65},border:{bottom:{style:BorderStyle.SINGLE,size:5,color:DARK,space:3}},children:[new TextRun({text:t.toUpperCase(),bold:true,size:19,color:DARK,font:'Calibri',characterSpacing:60})]});
+  const p=(t,o={})=>new Paragraph({spacing:{before:28,after:28},alignment:o.justify?AlignmentType.JUSTIFIED:AlignmentType.LEFT,children:[new TextRun({text:t,size:19,font:'Calibri',...o})]});
+  const bl=t=>new Paragraph({spacing:{before:22,after:22},indent:{left:280,hanging:140},children:[new TextRun({text:'• '+t.replace(/^[-•]\s*/,''),size:19,font:'Calibri'})]});
+  const sp=()=>new Paragraph({spacing:{before:60},children:[new TextRun('')]});
+
+  if(type==='lettre'){
+    const exp1=d.exps[0]||{};
+    const certList=(d.certifications||'').split('\n').filter(s=>s.trim()).map(s=>s.replace(/^[-•]\s*/,'')).join(', ');
+    const poste=d.lPoste||'alternance en Logistique / Supply Chain';
+    const motiv=d.lMotiv?`Votre entreprise retient particulièrement mon attention pour ${d.lMotiv.trim()}. Je suis convaincu que votre environnement me permettrait d'apporter une contribution opérationnelle réelle dès le début de mon alternance.`:`Votre entreprise retient particulièrement mon attention pour son positionnement dans le secteur. Je suis convaincu que votre environnement me permettrait d'apporter une contribution opérationnelle réelle dès le début de mon alternance.`;
+    const contact=[d.ville,d.tel,d.email].filter(Boolean).join('  ·  ');
+    const para2=exp1.title?`Mon expérience la plus significative est celle de ${exp1.title}${exp1.company?' chez '+exp1.company:''}. J'y ai développé des compétences concrètes en gestion des flux, coordination multi-interlocuteurs et analyse terrain.`:"Au cours de ma formation, j'ai développé des compétences concrètes en gestion des stocks et coordination logistique.";
+    const para3=`Ma formation m'a apporté de solides bases en amélioration continue. ${d.competences?`Je maîtrise les principaux outils du secteur (${d.competences.split(/[,\n]/)[0].trim()}, etc.).`:''} ${certList?`J'ai complété mon parcours par des certifications : ${certList}.`:''}`;
+    const children=[p([d.prenom,d.nom].filter(Boolean).join(' '),{bold:true,size:24}),p(d.titre||'',{italics:true,color:GREY,size:19}),p(contact,{color:GREY,size:18}),sp(),new Paragraph({alignment:AlignmentType.RIGHT,spacing:{before:0,after:35},children:[new TextRun({text:d.lEntreprise||'[Entreprise]',bold:true,size:20,font:'Calibri'})]}),new Paragraph({alignment:AlignmentType.RIGHT,spacing:{before:0,after:35},children:[new TextRun({text:d.lVille||'[Ville]',size:19,font:'Calibri',color:GREY})]}),sp(),new Paragraph({alignment:AlignmentType.RIGHT,children:[new TextRun({text:`${d.lVille||'[Ville]'}, le ${d.lDate||new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}`,size:19,font:'Calibri',color:GREY})]}),sp(),new Paragraph({children:[new TextRun({text:'Objet : ',bold:true,size:20,font:'Calibri'}),new TextRun({text:`Candidature — ${poste}`,bold:true,underline:{type:UnderlineType.SINGLE},size:20,font:'Calibri'})]}),sp(),p('Madame, Monsieur,'),sp(),p(`Actuellement étudiant${d.titre?` en ${d.titre}`:''}, je suis à la recherche d'une ${poste} à compter de la rentrée prochaine. Fortement attiré par les métiers opérationnels de la supply chain, je me permets de vous soumettre ma candidature.`,{justify:true}),p(para2,{justify:true}),p(para3,{justify:true}),p(motiv,{justify:true}),p('Disponible pour un entretien à votre convenance, je reste à votre disposition pour tout complément d\'information. Dans l\'attente de votre retour, je vous adresse mes meilleures salutations.',{justify:true}),sp(),p('Bien cordialement,'),sp(),sp(),p(nom,{bold:true})];
+    const doc2=new Document({styles:{default:{document:{run:{font:'Calibri',size:20}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1200,right:1200,bottom:1200,left:1200}}},children}]});
+    dl(await Packer.toBlob(doc2),`Lettre_${nom.replace(/\s+/g,'_')}.docx`);return;
+  }
+
+  // CV export
+  const children=[];
+  children.push(new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:nom,bold:true,size:34,font:'Calibri',color:DARK})]}));
+  const sub=[d.ville,d.tel,d.email,d.permis].filter(Boolean).join(' — ');
+  if(sub)children.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:40,after:25},children:[new TextRun({text:sub,size:17,font:'Calibri',color:GREY})]}));
+  if(d.titre)children.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:30},children:[new TextRun({text:d.titre,size:17,font:'Calibri',color:GREY,italics:true})]}));
+  if(d.profil){children.push(h('Profil'));children.push(p(d.profil,{justify:true}));}
+  if(d.exps.length){children.push(h('Expériences professionnelles'));d.exps.forEach(e=>{if(!e.title&&!e.company)return;children.push(new Paragraph({spacing:{before:120,after:20},children:[new TextRun({text:e.title||'',bold:true,size:20,font:'Calibri'}),e.dates?new TextRun({text:'   '+e.dates,size:16,color:GREY,font:'Calibri'}):new TextRun('')]}));if(e.company||e.loc)children.push(p([e.company,e.loc].filter(Boolean).join(' — '),{italics:true,color:'444444',size:17}));if(e.desc)e.desc.split('\n').filter(l=>l.trim()).forEach(l=>children.push(bl(l)));});}
+  if(d.frms.length){children.push(h('Formation'));d.frms.forEach(f=>{if(!f.degree&&!f.school)return;children.push(new Paragraph({spacing:{before:100,after:18},children:[new TextRun({text:f.degree||'',bold:true,size:20,font:'Calibri'}),f.dates?new TextRun({text:'   '+f.dates,size:16,color:GREY,font:'Calibri'}):new TextRun('')]}));if(f.school)children.push(p([f.school,f.mention].filter(Boolean).join(' — '),{italics:true,color:'444444',size:17}));});}
+  const compItems=d.competences.split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
+  if(compItems.length){children.push(h('Compétences'));compItems.forEach(c=>children.push(bl(c)));}
+  const certItems=d.certifications.split('\n').map(s=>s.replace(/^[-•]\s*/,'').trim()).filter(Boolean);
+  if(certItems.length){children.push(h('Certifications'));certItems.forEach(c=>children.push(bl(c)));}
+  if(d.langues){children.push(h('Langues'));children.push(p(d.langues));}
+  if(d.atouts){children.push(h('Atouts'));children.push(p(d.atouts));}
+  if(d.interets){children.push(h("Centres d'intérêt"));children.push(p(d.interets));}
+  const doc2=new Document({styles:{default:{document:{run:{font:'Calibri',size:19}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:800,right:900,bottom:800,left:900}}},children}]});
+  dl(await Packer.toBlob(doc2),`CV_${nom.replace(/\s+/g,'_')}.docx`);
+}
+
+async function _exportWordText(text,fname){
+  const {Document,Packer,Paragraph,TextRun,AlignmentType,BorderStyle}=docx;
+  const lines=text.split('\n');
+  const children=lines.map(line=>{
+    const t=line.trim();
+    const isSec=t===t.toUpperCase()&&t.length>2&&t.length<60&&/[A-Z]/.test(t)&&!t.startsWith('-');
+    const isBul=t.startsWith('-')||t.startsWith('•');
+    if(isSec&&t.length>0)return new Paragraph({spacing:{before:220,after:60},border:{bottom:{style:BorderStyle.SINGLE,size:5,color:'111111',space:3}},children:[new TextRun({text:t,bold:true,size:19,font:'Calibri',characterSpacing:60})]});
+    if(isBul)return new Paragraph({spacing:{before:22,after:22},indent:{left:280,hanging:140},children:[new TextRun({text:'• '+t.replace(/^[-•]\s*/,''),size:19,font:'Calibri'})]});
+    if(!t)return new Paragraph({spacing:{before:55},children:[new TextRun('')]});
+    return new Paragraph({spacing:{before:28,after:28},alignment:AlignmentType.JUSTIFIED,children:[new TextRun({text:t,size:19,font:'Calibri'})]});
+  });
+  const doc2=new Document({styles:{default:{document:{run:{font:'Calibri',size:19}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:900,right:1000,bottom:900,left:1000}}},children}]});
+  dl(await Packer.toBlob(doc2),`${fname}.docx`);
+}
+
+/* ═══ PDF EXPORT ═══ */
+function exportPdfCV(){_exportPdf('cv');}
+function exportPdfLettre(){_exportPdf('lettre');}
+async function exportAdapterPdf(){
+  const type=document.getElementById('adapterType').value;
+  if(type==='cv'||type==='both')_exportPdfText(adapterResult.cv,'CV_Adapte');
+  if(type==='lettre'||type==='both')_exportPdfText(adapterResult.lettre,'Lettre_Adaptee');
+}
+
+function _exportPdf(type){
+  const el=document.getElementById('cvDoc');
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const w=pdf.internal.pageSize.getWidth(),h=pdf.internal.pageSize.getHeight();
+  // Use html2canvas approach via jspdf html method
+  pdf.html(el,{callback:doc=>{doc.save(`${type==='cv'?'CV':'Lettre'}_${getData().prenom||''}${getData().nom||''}.pdf`);},x:10,y:10,width:w-20,windowWidth:700});
+}
+
+function _exportPdfText(text,fname){
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const margin=18,pageW=210,lineH=6,maxW=pageW-margin*2;
+  let y=margin;
+  pdf.setFont('helvetica');
+  text.split('\n').forEach(line=>{
+    const t=line.trim();
+    if(!t){y+=3;return;}
+    const isSec=t===t.toUpperCase()&&t.length>2&&/[A-Z]/.test(t)&&!t.startsWith('-');
+    if(isSec){
+      y+=4;pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+      pdf.text(t,margin,y);pdf.line(margin,y+1,pageW-margin,y+1);y+=6;
+    } else {
+      pdf.setFontSize(9);pdf.setFont('helvetica','normal');
+      const lines=pdf.splitTextToSize(t.startsWith('-')?'• '+t.slice(1):t,maxW);
+      lines.forEach(l=>{if(y>285){pdf.addPage();y=margin;}pdf.text(l,t.startsWith('-')?margin+3:margin,y);y+=lineH;});
+    }
+  });
+  pdf.save(fname+'.pdf');
+}
+
+function dl(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
+
+/* ═══ OPTIMIZE CV ═══ */
+async function optimizeCV() {
+  const d=getData();
+  const hasContent=d.profil||d.exps.some(e=>e.desc)||d.competences;
+  if(!hasContent){document.getElementById('statusOptCV').textContent='Remplis d\'abord ton profil et tes expériences.';return;}
+
+  const btn=document.getElementById('btnOptCV'),icon=document.getElementById('optCVIcon'),txt=document.getElementById('optCVTxt'),status=document.getElementById('statusOptCV');
+  btn.disabled=true;icon.innerHTML='<span class="spinner" style="border-color:rgba(255,255,255,.35);border-top-color:#fff"></span>';txt.textContent='Optimisation en cours...';status.textContent='L\'IA améliore ton CV...';
+
+  const prompt=`Tu es un expert en recrutement et rédaction de CV professionnels en France (logistique/supply chain).
+
+Voici les informations brutes du candidat :
+PROFIL: ${d.profil||''}
+EXPÉRIENCES:
+${d.exps.map(e=>`- ${e.title||''} chez ${e.company||''} (${e.dates||''})\n${e.desc||''}`).join('\n\n')}
+COMPÉTENCES: ${d.competences||''}
+ATOUTS: ${d.atouts||''}
+
+Réécris ces éléments en utilisant un vocabulaire professionnel, technique et percutant adapté au secteur logistique/supply chain. 
+
+Réponds UNIQUEMENT en JSON avec exactement cette structure (garde les mêmes expériences dans le même ordre):
+{
+  "profil": "nouveau profil optimisé",
+  "exps": [
+    {"desc": "- bullet point 1 optimisé\n- bullet point 2 optimisé\n- ..."},
+    ...
+  ],
+  "competences": "compétences réécrites",
+  "atouts": "atouts réécrits"
+}
+
+Règles importantes:
+- Chaque bullet point doit commencer par un verbe d'action fort (Piloté, Optimisé, Coordonné, Analysé, etc.)
+- Utilise des termes techniques du secteur (flux logistiques, KPI, ERP, traçabilité, etc.)
+- Sois concis et impactant
+- Ne jamais inventer des expériences ou compétences qui n'existent pas`;
+
+  try {
+    const raw=await groq(prompt);
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const data=JSON.parse(clean);
+
+    // Apply optimized content back to form fields
+    if(data.profil){document.getElementById('profil').value=data.profil;}
+    if(data.competences){document.getElementById('competences').value=data.competences;}
+    if(data.atouts){document.getElementById('atouts').value=data.atouts;}
+    if(data.exps&&Array.isArray(data.exps)){
+      const expInputs=document.querySelectorAll('[data-f="desc"]');
+      data.exps.forEach((e,i)=>{if(expInputs[i]&&e.desc)expInputs[i].value=e.desc;});
+    }
+
+    render();
+    status.style.color='#15622e';status.textContent='✓ CV optimisé avec succès !';
+    document.getElementById('optimizeCVBanner').classList.add('show');
+    setTimeout(()=>{status.textContent='';},4000);
+  } catch(e) {
+    status.textContent='Erreur lors de l\'optimisation. Réessaie.';
+    console.error(e);
+  } finally {
+    btn.disabled=false;icon.textContent='✦';txt.textContent='Optimiser mon CV avec l\'IA';
+  }
+}
+
+/* ═══ OPTIMIZE LETTRE ═══ */
+let optimizedLettreText = '';
+async function optimizeLettre() {
+  const d=getData();
+  const nom=[d.prenom,d.nom].filter(Boolean).join(' ')||'Le candidat';
+  const poste=d.lPoste||'alternance en Logistique / Supply Chain';
+
+  const btn=document.getElementById('btnOptLettre'),icon=document.getElementById('optLettreIcon'),txt=document.getElementById('optLettreTxt'),status=document.getElementById('statusOptLettre');
+  btn.disabled=true;icon.innerHTML='<span class="spinner" style="border-color:rgba(255,255,255,.35);border-top-color:#fff"></span>';txt.textContent='Optimisation en cours...';status.textContent='L\'IA améliore ta lettre...';
+
+  const exp1=d.exps[0]||{};
+  const certList=(d.certifications||'').split('\n').filter(s=>s.trim()).map(s=>s.replace(/^[-•]\s*/,'')).join(', ');
+  const cvSummary=`Nom: ${nom}\nFormation: ${(d.frms[0]||{}).degree||''} — ${(d.frms[0]||{}).school||''}\nExpérience principale: ${exp1.title||''} chez ${exp1.company||''} (${exp1.dates||''})\nCompétences: ${d.competences||''}\nCertifications: ${certList}\nAtouts: ${d.atouts||''}\nLangues: ${d.langues||''}`;
+
+  const prompt=`Tu es expert en rédaction de lettres de motivation percutantes pour le secteur logistique/supply chain en France.
+
+Voici le profil du candidat :
+${cvSummary}
+
+Poste visé : ${poste}
+Entreprise : ${d.lEntreprise||'[Entreprise]'}
+Motivation spécifique : ${d.lMotiv||''}
+
+Rédige une lettre de motivation PROFESSIONNELLE et PERCUTANTE qui :
+- Commence par une accroche forte et originale (pas "Je me permets de vous adresser")
+- Utilise un vocabulaire technique et professionnel du secteur logistique
+- Montre une vraie valeur ajoutée avec des éléments concrets et chiffrés si possible
+- A un ton direct, confiant, sans être arrogant
+- Fait 4 paragraphes bien structurés + formule de politesse
+- Inclut l'en-tête complet : ${nom}, contact, date d'aujourd'hui, destinataire
+- Corps entre 380 et 430 mots
+
+Écris UNIQUEMENT la lettre complète et rien d'autre.`;
+
+  try {
+    const result=await groq(prompt);
+    optimizedLettreText=result.trim();
+
+    // Display in preview
+    document.getElementById('cvDoc').innerHTML=`
+      <div style="padding:2.5rem 2.8rem;font-size:.83rem;line-height:1.85;color:#222;white-space:pre-wrap">${optimizedLettreText}</div>`;
+
+    status.style.color='#15622e';status.textContent='✓ Lettre optimisée avec succès !';
+    document.getElementById('optimizeLettreBanner').classList.add('show');
+    setTimeout(()=>{status.textContent='';},4000);
+  } catch(e) {
+    status.textContent='Erreur lors de l\'optimisation. Réessaie.';
+  } finally {
+    btn.disabled=false;icon.textContent='✦';txt.textContent='Optimiser la lettre avec l\'IA';
+  }
+}
+
+/* ═══ INIT ═══ */
+window.onload=()=>{
+  if(!localStorage.getItem(STORE)){addExp();addForm();}else load();
+  document.getElementById('lDate').value=new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+};
+</script>
+</body>
+</html>
